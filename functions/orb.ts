@@ -8,16 +8,19 @@ function isAValidUrl(value: string): boolean {
 }
 
 export async function onRequestPost({ env, request }): Promise<Response> {
-    const formData: object = await request.formData();
-    const alias: string = await formData.get(`alias`);
-    const url: string = await formData.get(`url`);
+    const formData: FormData = await request.formData();
+    const alias: File | string = formData.get(`alias`);
+    const url: File | string = formData.get(`url`);
+    if (typeof alias !== 'string' || typeof url !== 'string') {
+        return new Response(`the orb rejected your request.\n`);
+    }
     if (!alias || alias.length < 4 || alias.length > 128 || alias.includes(`.`)) {
         return new Response(`the orb rejected your alias.\n`);
     }
     if (!url || url.length < 4 || url.length > 2048 || !isAValidUrl(url)) {
         return new Response(`the orb rejected your invalid url.\n`);
     }
-    const checkIfExists = await env.links.get(alias, { cacheTtl: 86400 });
+    const checkIfExists: KVNamespace["get"] = await env.links.get(alias, { cacheTtl: 86400 });
     if (checkIfExists) {
         return new Response(`the orb rejected your access to rewrite this link.\n`);
     }
