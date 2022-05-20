@@ -1,6 +1,6 @@
 function isAValidUrl(value: string): boolean {
     try {
-        const url = new URL(value);
+        new URL(value);
         return true;
     } catch (TypeError) {
         return false;
@@ -8,22 +8,13 @@ function isAValidUrl(value: string): boolean {
 }
 
 export async function onRequestPost({ env, request }): Promise<Response> {
-    const formData = await request.formData();
-    const alias = await formData.get(`alias`);
-    const url = await formData.get(`url`);
-    if (
-        !alias ||
-        alias.length < 4 ||
-        alias.length > 128 ||
-        alias.includes(`.`)
-
-    ) {
+    const formData: object = await request.formData();
+    const alias: string = await formData.get(`alias`);
+    const url: string = await formData.get(`url`);
+    if (!alias || alias.length < 4 || alias.length > 128 || alias.includes(`.`)) {
         return new Response(`the orb rejected your alias.\n`);
     }
-    if (!url ||
-        url.length < 4 ||
-        url.length > 2048 ||
-        !isAValidUrl(url)) {
+    if (!url || url.length < 4 || url.length > 2048 || !isAValidUrl(url)) {
         return new Response(`the orb rejected your invalid url.\n`);
     }
     const checkIfExists = await env.links.get(alias, { cacheTtl: 86400 });
