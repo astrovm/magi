@@ -1,4 +1,4 @@
-function isAValidUrl(input: string): boolean {
+const isAValidUrl = (input: string): boolean => {
     try {
         new URL(input);
         return true;
@@ -7,7 +7,7 @@ function isAValidUrl(input: string): boolean {
     }
 }
 
-function hasSpecialChars(input: string): boolean {
+const hasSpecialChars = (input: string): boolean => {
     if (input === encodeURIComponent(input)) {
         return false;
     } else {
@@ -15,7 +15,7 @@ function hasSpecialChars(input: string): boolean {
     }
 }
 
-export async function onRequestPost({ env, request }): Promise<Response> {
+export const onRequestPost = async ({ env, request }): Promise<Response> => {
     const formData: FormData = await request.formData();
     const alias: File | string = formData.get(`alias`);
     const url: File | string = formData.get(`url`);

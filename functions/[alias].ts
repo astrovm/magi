@@ -1,4 +1,4 @@
-export async function onRequestGet({ env, params, request }): Promise<Response> {
+export const onRequestGet = async ({ env, params, request }): Promise<Response> => {
     const alias: string = params.alias;
     if (alias.includes('.')) {
         return env.ASSETS.fetch(request);
