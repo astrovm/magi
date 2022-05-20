@@ -24,8 +24,8 @@ export async function onRequestPost({ env, request }): Promise<Response> {
     if (checkIfExists) {
         return new Response(`the orb rejected your access to rewrite this link.\n`);
     }
-    await env.links.put(alias, url);
+    await env.links.put(alias.toLowerCase(), url);
     return new Response(
-        `the worm summoned your link https://magi.lol/${alias}.\n`
+        `the worm summoned your link https://magi.lol/${alias}\n`
     );
 }
