@@ -1,3 +1,8 @@
+export async function onRequestGet({ env, request }): Promise<Response> {
+    const origin = new URL(request.url).origin;
+    return env.ASSETS.fetch(new Request(origin));
+}
+
 function isAValidUrl(value: string): boolean {
     try {
         const url = new URL(value);
@@ -7,7 +12,7 @@ function isAValidUrl(value: string): boolean {
     }
 }
 
-export async function onRequestPost({ env, request }) {
+export async function onRequestPost({ env, request }): Promise<Response> {
     const formData = await request.formData();
     const alias = await formData.get(`alias`);
     const url = await formData.get(`url`);

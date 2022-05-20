@@ -1,4 +1,4 @@
-export async function onRequestGet({ env, params, request }) {
+export async function onRequestGet({ env, params, request }): Promise<Response> {
     if (params.alias.includes('.')) {
         return env.ASSETS.fetch(request);
     }
