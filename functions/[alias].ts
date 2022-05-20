@@ -5,9 +5,7 @@ export const onRequestGet = async ({ env, params, request }): Promise<Response> 
     if (alias.includes('.')) {
         return env.ASSETS.fetch(request);
     }
-    if (alias.length > 4096) {
-        return new Response(`the orb rejected your link.\n`);
-    }
+
     const aliasEncoded: string = decodeURIComponent(alias).toLowerCase().replace(/\s/g, '-');
     const aliasHash: string = await hashText(aliasEncoded);
 

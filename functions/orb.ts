@@ -10,7 +10,7 @@ export const onRequestPost = async ({ env, request }): Promise<Response> => {
     }
 
     const aliasReplaceSpaces: string = alias.replace(/\s/g, '-');
-    if (alias.length < 4 || alias.length > 2048 || alias.includes(`.`) || hasSpecialChars(aliasReplaceSpaces)) {
+    if (alias.length < 4 || alias.length > (2 ** 16) || alias.includes(`.`) || hasSpecialChars(aliasReplaceSpaces)) {
         return new Response(`the orb rejected your alias.\n`);
     }
     if (url.length > 2048 || !isAValidUrl(url)) {
