@@ -1,5 +1,3 @@
-import { hash } from "spark-md5";
-
 const isAValidUrl = (input: string): boolean => {
     try {
         new URL(input);
@@ -15,6 +13,14 @@ const hasSpecialChars = (input: string): boolean => {
     } else {
         return true;
     }
+}
+
+const digestMessage = async (message: string) => {
+    const msgUint8: Uint8Array = new TextEncoder().encode(message);                           // encode as (utf-8) Uint8Array
+    const hashBuffer: ArrayBuffer = await crypto.subtle.digest('MD5', msgUint8);           // hash the message
+    const hashArray: number[] = Array.from(new Uint8Array(hashBuffer));                     // convert buffer to byte array
+    const hashHex: string = hashArray.map(b => b.toString(16).padStart(2, '0')).join(''); // convert bytes to hex string
+    return hashHex;
 }
 
 export const onRequestPost = async ({ env, request }): Promise<Response> => {
@@ -35,7 +41,7 @@ export const onRequestPost = async ({ env, request }): Promise<Response> => {
     }
 
     const aliasLowerCase: string = aliasReplaceSpaces.toLowerCase();
-    const aliasHash = hash(aliasLowerCase);
+    const aliasHash: string = await digestMessage(aliasLowerCase);
 
     const checkIfExists: KVNamespace["get"] = await env.links.get(aliasHash, { cacheTtl: 86400 });
     if (checkIfExists) {

@@ -1,9 +1,10 @@
 {
-  "dependencies": {
-    "spark-md5": "^3.0.2"
-  },
+  "name": "magi",
+  "description": "a wizard worm that powers an orb",
+  "author": "astrolince",
+  "dependencies": {},
   "devDependencies": {
-    "@cloudflare/workers-types": "^3.10.0",
-    "wrangler": "^2.0.6"
-  }
+    "@cloudflare/workers-types": "^3.10.0"
+  },
+  "license": "MIT"
 }
