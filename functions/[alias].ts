@@ -6,7 +6,8 @@ export async function onRequestGet({ env, params, request }): Promise<Response> 
     if (alias.length > 128) {
         return new Response(`the orb rejected your link.\n`);
     }
-    const destinationURL: string = await env.links.get(alias.toLowerCase(), { cacheTtl: 86400 });
+    const aliasLowerCase: string = alias.toLowerCase();
+    const destinationURL: string = await env.links.get(aliasLowerCase, { cacheTtl: 86400 });
     const statusCode: number = 301;
     return Response.redirect(destinationURL, statusCode);
 }

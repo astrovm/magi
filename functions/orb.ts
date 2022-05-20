@@ -20,11 +20,12 @@ export async function onRequestPost({ env, request }): Promise<Response> {
     if (!url || url.length < 4 || url.length > 2048 || !isAValidUrl(url)) {
         return new Response(`the orb rejected your invalid url.\n`);
     }
-    const checkIfExists: KVNamespace["get"] = await env.links.get(alias, { cacheTtl: 86400 });
+    const aliasLowerCase: string = alias.toLowerCase();
+    const checkIfExists: KVNamespace["get"] = await env.links.get(aliasLowerCase, { cacheTtl: 86400 });
     if (checkIfExists) {
         return new Response(`the orb rejected your access to rewrite this link.\n`);
     }
-    await env.links.put(alias.toLowerCase(), url);
+    await env.links.put(aliasLowerCase, url);
     return new Response(
         `the worm summoned your link https://magi.lol/${alias}\n`
     );
