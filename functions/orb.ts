@@ -5,11 +5,11 @@ export const onRequestPost = async ({ env, request }): Promise<Response> => {
     const alias: File | string = formData.get(`alias`);
     const url: File | string = formData.get(`url`);
 
-    if (!alias || typeof alias !== 'string' || !url || typeof url !== 'string') {
+    if (!alias || typeof alias !== `string` || !url || typeof url !== `string`) {
         return new Response(`the orb rejected your request.\n`);
     }
 
-    const aliasReplaceSpaces: string = alias.replace(/\s/g, '-');
+    const aliasReplaceSpaces: string = alias.replace(/\s/g, `-`);
     if (alias.length < 4 || alias.length > 13312 || alias.includes(`.`) || hasSpecialChars(aliasReplaceSpaces)) {
         return new Response(`the orb rejected your alias.\n`);
     }
