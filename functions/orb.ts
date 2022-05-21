@@ -1,31 +1,35 @@
-import { isAValidUrl, hasSpecialChars, hashText } from '../modules/common';
+import Alias from '../modules/aliasClass';
+import Url from '../modules/urlClass';
 
 export const onRequestPost = async ({ env, request }): Promise<Response> => {
-  const formData: FormData = await request.formData();
-  const alias: File | string = formData.get('alias');
-  const url: File | string = formData.get('url');
+  const formFields: FormData = await request.formData();
+  const aliasField: File | string = formFields.get('alias');
+  const urlField: File | string = formFields.get('url');
 
-  if (!alias || typeof alias !== 'string' || !url || typeof url !== 'string') {
+  if (!aliasField || typeof aliasField !== 'string' || !urlField || typeof urlField !== 'string') {
     return new Response('the orb rejected your request.\n');
   }
 
-  const aliasReplaceSpaces: string = alias.replace(/\s/g, '-');
-  if (alias.length < 4 || alias.length > 13312 || alias.includes('.') || hasSpecialChars(aliasReplaceSpaces)) {
+  const alias: Alias = new Alias(aliasField);
+  alias.replaceSpacesWith('-');
+  if (alias.lenghtIsGreaterThan(13312) || alias.includes('.') || alias.hasSpecialChars()) {
     return new Response('the orb rejected your alias.\n');
   }
-  if (url.length > 2048 || !isAValidUrl(url)) {
+
+  const url = new Url(urlField);
+  if (url.lenghtIsGreaterThan(2048) || !url.isAValidUrl()) {
     return new Response('the orb rejected your invalid url.\n');
   }
 
-  const aliasLowerCase: string = aliasReplaceSpaces.toLowerCase();
-  const aliasHash: string = await hashText(aliasLowerCase);
+  const aliasHash: string = await alias.getHash();
 
   const checkIfExists: KVNamespace['get'] = await env.links.get(aliasHash, { cacheTtl: 86400 });
   if (checkIfExists) {
     return new Response('the orb rejected your access to rewrite this link.\n');
   }
+
   await env.links.put(aliasHash, url);
   return new Response(
-    `the worm summoned your link https://magi.lol/${aliasReplaceSpaces}\n`,
+    `the worm summoned your link https://magi.lol/${alias.get()}\n`,
   );
 };
