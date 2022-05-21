@@ -7,15 +7,15 @@ export default class Url {
     this.url = url;
   }
 
-  get() {
+  get(): string {
     return this.url;
   }
 
-  isAValidUrl() {
+  isAValidUrl(): boolean {
     return isAValidUrl(this.url);
   }
 
-  lenghtIsGreaterThan(lenght: number) {
+  lenghtIsGreaterThan(lenght: number): boolean {
     return this.url.length > lenght;
   }
 }

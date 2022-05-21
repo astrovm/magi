@@ -7,7 +7,7 @@ export default class Alias {
     this.alias = alias;
   }
 
-  get() {
+  get(): string {
     return this.alias;
   }
 
@@ -15,19 +15,19 @@ export default class Alias {
     this.alias = this.alias.replace(/\s/g, char);
   }
 
-  lenghtIsGreaterThan(lenght: number) {
+  lenghtIsGreaterThan(lenght: number): boolean {
     return this.alias.length > lenght;
   }
 
-  includes(char: string) {
+  includes(char: string): boolean {
     return this.alias.includes(char);
   }
 
-  hasSpecialChars() {
+  hasSpecialChars(): boolean {
     return hasSpecialChars(this.alias);
   }
 
-  async getHash() {
+  async getHash(): Promise<string> {
     const lowerCaseAlias = this.alias.toLowerCase();
     return hashText(lowerCaseAlias);
   }
