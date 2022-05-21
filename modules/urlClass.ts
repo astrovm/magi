@@ -7,6 +7,10 @@ export default class Url {
     this.url = url;
   }
 
+  get() {
+    return this.url;
+  }
+
   isAValidUrl() {
     return isAValidUrl(this.url);
   }

@@ -7,6 +7,10 @@ export default class Alias {
     this.alias = alias;
   }
 
+  get() {
+    return this.alias;
+  }
+
   replaceSpacesWith(char: string) {
     this.alias = this.alias.replace(/\s/g, char);
   }
@@ -26,10 +30,6 @@ export default class Alias {
   async getHash() {
     const lowerCaseAlias = this.alias.toLowerCase();
     return hashText(lowerCaseAlias);
-  }
-
-  get() {
-    return this.alias;
   }
 
   decode() {
