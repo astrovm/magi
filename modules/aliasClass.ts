@@ -11,7 +11,7 @@ export default class Alias {
     return this.alias;
   }
 
-  replaceSpacesWith(char: string) {
+  replaceSpacesWith(char: string): void {
     this.alias = this.alias.replace(/\s/g, char);
   }
 
@@ -32,7 +32,7 @@ export default class Alias {
     return hashText(lowerCaseAlias);
   }
 
-  decode() {
+  decode(): void {
     this.alias = decodeURIComponent(this.alias);
   }
 }
