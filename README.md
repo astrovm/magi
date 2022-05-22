@@ -2,7 +2,7 @@
 
 A wizard worm that powers an orb.
 
-![Magi](/magi.webp)
+![Magi](/public/magi.webp)
 
 ## License
 
