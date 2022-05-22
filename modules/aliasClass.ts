@@ -27,12 +27,12 @@ export default class Alias {
     return hasSpecialChars(this.alias);
   }
 
+  decode(): void {
+    this.alias = decodeURIComponent(this.alias);
+  }
+
   async getHash(): Promise<string> {
     const lowerCaseAlias = this.alias.toLowerCase();
     return hashText(lowerCaseAlias);
-  }
-
-  decode(): void {
-    this.alias = decodeURIComponent(this.alias);
   }
 }

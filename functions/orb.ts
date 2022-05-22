@@ -17,7 +17,7 @@ export const onRequestPost = async ({ env, request }): Promise<Response> => {
   }
 
   const url = new Url(urlField);
-  if (url.lenghtIsGreaterThan(2048) || !url.isAValidUrl()) {
+  if (url.lenghtIsGreaterThan(2048) || !url.isValid()) {
     return new Response('the orb rejected your invalid url.\n');
   }
 

@@ -11,7 +11,7 @@ export default class Url {
     return this.url;
   }
 
-  isAValidUrl(): boolean {
+  isValid(): boolean {
     return isAValidUrl(this.url);
   }
 
