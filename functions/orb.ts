@@ -1,7 +1,9 @@
 import Alias from '../modules/aliasClass';
 import Url from '../modules/urlClass';
 
-export const onRequestPost = async ({ env, request }): Promise<Response> => {
+export const onRequestPost = async (
+  { env, request }: { env: any, request: Request },
+): Promise<Response> => {
   const formFields: FormData = await request.formData();
   const aliasField: File | string = formFields.get('alias');
   const urlField: File | string = formFields.get('url');
