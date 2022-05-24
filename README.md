@@ -1,8 +1,8 @@
-# Magi
+# ![Magi](/public/logo3d.webp)
 
 A wizard worm that powers an orb.
 
-![Magi](/public/magi.webp)
+![Wizard worm](/public/magi.webp)
 
 ## License
 

@@ -1,4 +1,5 @@
 body {
-  background-image: url('/magi.webp');
+  background-image: url('/forest.webp');
+  background-size: cover;
   text-align: center;
 }
