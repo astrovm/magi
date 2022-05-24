@@ -1,5 +1,9 @@
 body {
-  background-image: url('/forest.webp');
+  background-image: url("/forest.webp");
   background-size: cover;
   text-align: center;
+}
+
+#wizard {
+  width: 300px;
 }
