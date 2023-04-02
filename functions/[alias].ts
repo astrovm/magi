@@ -1,13 +1,27 @@
 import Alias from '../modules/aliasClass';
 
-export const onRequestGet = async (
-  { env, params, request }: { env: any, params: Params, request: Request },
-): Promise<Response> => {
-  if (typeof params.alias !== 'string') {
+type RequestData = { env: any, params: Params, request: Request };
+
+function isString(value: any): value is string {
+  return typeof value === 'string';
+}
+
+async function validateAliasParam(params: Params): Promise<string | null> {
+  if (isString(params.alias)) {
+    return params.alias;
+  }
+
+  return null;
+}
+
+export const onRequestGet = async ({ env, params, request }: RequestData): Promise<Response> => {
+  const aliasParam = await validateAliasParam(params);
+
+  if (!aliasParam) {
     return new Response('the orb rejected your request.\n');
   }
 
-  const alias: Alias = new Alias(params.alias);
+  const alias: Alias = new Alias(aliasParam);
   if (alias.includes('.')) {
     return env.ASSETS.fetch(request);
   }
