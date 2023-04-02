@@ -1,26 +1,28 @@
 export const isAValidUrl = (input: string): boolean => {
   try {
     const url = new URL(input);
-    if (url.protocol === 'http:' || url.protocol === 'https:') {
-      return true;
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch (error) {
+    if (error instanceof TypeError) {
+      return false;
     }
-    return false;
-  } catch (TypeError) {
-    return false;
+    throw error;
   }
 };
 
 export const hasSpecialChars = (input: string): boolean => {
-  if (input === encodeURIComponent(input)) {
-    return false;
-  }
-  return true;
+  return input !== encodeURIComponent(input);
 };
 
 export const hashText = async (text: string): Promise<string> => {
-  const msgUint8: Uint8Array = new TextEncoder().encode(text); // encode as (utf-8) Uint8Array
-  const hashBuffer: ArrayBuffer = await crypto.subtle.digest('MD5', msgUint8); // hash the message
-  const hashArray: number[] = Array.from(new Uint8Array(hashBuffer)); // convert buffer to bytearray
-  const hashHex: string = hashArray.map((b) => b.toString(16).padStart(2, '0')).join(''); // convert bytes to hex string
-  return hashHex;
+  try {
+    const utf8Array: Uint8Array = new TextEncoder().encode(text);
+    const hashBuffer: ArrayBuffer = await crypto.subtle.digest('MD5', utf8Array);
+    const hashArray: number[] = Array.from(new Uint8Array(hashBuffer));
+    const hashHex: string = hashArray.map((byte) => byte.toString(16).padStart(2, '0')).join('');
+    return hashHex;
+  } catch (error) {
+    console.error('Error hashing text:', error);
+    throw error;
+  }
 };

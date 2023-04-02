@@ -29,12 +29,12 @@ export const onRequestPost = async ({ env, request }: RequestData): Promise<Resp
   const [aliasField, urlField] = inputs;
   const alias: Alias = new Alias(aliasField);
   alias.replaceSpacesWith('-');
-  if (alias.lenghtIsGreaterThan(13312) || alias.includes('.') || alias.hasSpecialChars()) {
+  if (alias.lengthIsGreaterThan(13312) || alias.includes('.') || alias.hasSpecialChars()) {
     return new Response('the orb rejected your alias.\n');
   }
 
   const url = new Url(urlField);
-  if (url.lenghtIsGreaterThan(2048) || !url.isValid()) {
+  if (url.lengthIsGreaterThan(2048) || !url.isValid()) {
     return new Response('the orb rejected your invalid url.\n');
   }
 

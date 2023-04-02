@@ -15,8 +15,8 @@ export default class Alias {
     this.alias = this.alias.replace(/\s/g, char);
   }
 
-  lenghtIsGreaterThan(lenght: number): boolean {
-    return this.alias.length > lenght;
+  lengthIsGreaterThan(length: number): boolean {
+    return this.alias.length > length;
   }
 
   includes(char: string): boolean {
@@ -34,5 +34,9 @@ export default class Alias {
   async getHash(): Promise<string> {
     const lowerCaseAlias = this.alias.toLowerCase();
     return hashText(lowerCaseAlias);
+  }
+
+  toString(): string {
+    return this.alias;
   }
 }

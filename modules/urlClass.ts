@@ -4,7 +4,14 @@ export default class Url {
   private url: string;
 
   constructor(url: string) {
+    this.validate(url);
     this.url = url;
+  }
+
+  private validate(url: string): void {
+    if (!isAValidUrl(url)) {
+      throw new Error('Invalid URL provided');
+    }
   }
 
   get(): string {
@@ -15,7 +22,11 @@ export default class Url {
     return isAValidUrl(this.url);
   }
 
-  lenghtIsGreaterThan(lenght: number): boolean {
-    return this.url.length > lenght;
+  lengthIsGreaterThan(length: number): boolean {
+    return this.url.length > length;
+  }
+
+  toString(): string {
+    return this.url;
   }
 }
