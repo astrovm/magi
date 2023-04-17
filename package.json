@@ -15,7 +15,7 @@
     "eslint-config-airbnb": "^19.0.4",
     "eslint-config-airbnb-typescript": "^17.0.0",
     "typescript": "^5.0.4",
-    "wrangler": "^2.0.6"
+    "wrangler": "^2.15.1"
   },
   "license": "MIT"
 }
