@@ -47,6 +47,6 @@ export const onRequestPost = async ({ env, request }: RequestData): Promise<Resp
 
   await env.links.put(aliasHash, url.get());
   return new Response(
-    `the worm summoned your link https://magi.lol/${alias.get()}\n`,
+    `the worm summoned your link https://magi.pm/${alias.get()}\n`,
   );
 };
