@@ -3,7 +3,3 @@
 A wizard worm that powers an orb.
 
 ![Wizard worm](/public/magi.webp)
-
-## License
-
-[MIT License](/LICENSE)
