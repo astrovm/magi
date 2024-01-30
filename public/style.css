@@ -5,6 +5,10 @@ body {
   color: white;
 }
 
+a {
+  color: hotpink;
+}
+
 #wizard {
   width: 300px;
 }
