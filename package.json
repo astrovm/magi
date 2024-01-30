@@ -1,7 +1,7 @@
 {
   "name": "magi",
   "description": "A wizard worm that powers an orb.",
-  "author": "astrolince",
+  "author": "4st.li",
   "scripts": {
     "start": "npx wrangler pages dev ./public --kv links",
     "lint": "npx eslint .",
