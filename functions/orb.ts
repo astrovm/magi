@@ -23,30 +23,30 @@ export const onRequestPost = async ({ env, request }: RequestData): Promise<Resp
   const inputs = await validateInputs(formFields);
 
   if (!inputs) {
-    return new Response('the orb rejected your request.\n');
+    return new Response('<p>the orb rejected your request.</p>');
   }
 
   const [aliasField, urlField] = inputs;
   const alias: Alias = new Alias(aliasField);
   alias.replaceSpacesWith('-');
   if (alias.lengthIsGreaterThan(13312) || alias.includes('.') || alias.hasSpecialChars()) {
-    return new Response('the orb rejected your alias.\n');
+    return new Response('<p>the orb rejected your alias.</p>');
   }
 
   const url = new Url(urlField);
   if (url.lengthIsGreaterThan(2048) || !url.isValid()) {
-    return new Response('the orb rejected your invalid url.\n');
+    return new Response('<p>the orb rejected your invalid url.</p>');
   }
 
   const aliasHash: string = await alias.getHash();
 
   const checkIfExists: KVNamespace['get'] = await env.links.get(aliasHash, { cacheTtl: 86400 });
   if (checkIfExists) {
-    return new Response('the orb rejected your access to rewrite this link.\n');
+    return new Response('<p>the orb rejected your access to rewrite this link.</p>');
   }
 
   await env.links.put(aliasHash, url.get());
   return new Response(
-    `the worm summoned your link https://magi.pm/${alias.get()}\n`,
+    `<p>the worm summoned your link <a href="https://s.4st.li/${alias.get()}">s.4st.li/${alias.get()}</a></p>`,
   );
 };
