@@ -14,4 +14,7 @@ module.exports = {
         'eslint:recommended',
         'plugin:@typescript-eslint/recommended'
     ],
+    rules: {
+        'import/prefer-default-export': 'off'
+    }
 };

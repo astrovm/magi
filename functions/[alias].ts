@@ -1,37 +1,39 @@
+import type { KVNamespace, PagesFunction } from '@cloudflare/workers-types';
 import Alias from '../modules/aliasClass';
 
-type RequestData = { env: any, params: Params, request: Request };
+type Env = {
+  links: KVNamespace;
+};
 
-function isString(value: any): value is string {
-  return typeof value === 'string';
-}
+const isString = (value: string | string[] | undefined): value is string => typeof value === 'string';
 
-async function validateAliasParam(params: Params): Promise<string | null> {
-  if (isString(params.alias)) {
-    return params.alias;
+const getAliasParam = (params: Record<'alias', string | string[] | undefined>): string | null => {
+  const aliasParam = params.alias;
+  if (isString(aliasParam)) {
+    return aliasParam;
   }
 
   return null;
-}
+};
 
-export const onRequestGet = async ({ env, params, request }: RequestData): Promise<Response> => {
-  const aliasParam = await validateAliasParam(params);
+export const onRequestGet: PagesFunction<Env, 'alias'> = async ({ env, params, request }) => {
+  const aliasParam = getAliasParam(params);
 
   if (!aliasParam) {
     return new Response('the orb rejected your request.\n');
   }
 
-  const alias: Alias = new Alias(aliasParam);
+  const alias = new Alias(aliasParam);
   if (alias.includes('.')) {
     return env.ASSETS.fetch(request);
   }
 
   alias.decode();
   alias.replaceSpacesWith('-');
-  const aliasHash: string = await alias.getHash();
+  const aliasHash = await alias.getHash();
 
-  const destinationURL: string = await env.links.get(aliasHash, { cacheTtl: 86400 });
-  if (!destinationURL) {
+  const destinationURL = await env.links.get(aliasHash, { cacheTtl: 86400 });
+  if (destinationURL === null) {
     return new Response('the orb didn\'t found this link.\n');
   }
 
