@@ -10,9 +10,7 @@ export const isAValidUrl = (input: string): boolean => {
   }
 };
 
-export const hasSpecialChars = (input: string): boolean => {
-  return input !== encodeURIComponent(input);
-};
+export const hasSpecialChars = (input: string): boolean => input !== encodeURIComponent(input);
 
 export const hashText = async (text: string): Promise<string> => {
   try {
@@ -22,7 +20,9 @@ export const hashText = async (text: string): Promise<string> => {
     const hashHex: string = hashArray.map((byte) => byte.toString(16).padStart(2, '0')).join('');
     return hashHex;
   } catch (error) {
-    console.error('Error hashing text:', error);
-    throw error;
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('Error hashing text');
   }
 };

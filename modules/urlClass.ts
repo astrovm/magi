@@ -4,11 +4,11 @@ export default class Url {
   private url: string;
 
   constructor(url: string) {
-    this.validate(url);
+    Url.validate(url);
     this.url = url;
   }
 
-  private validate(url: string): void {
+  private static validate(url: string): void {
     if (!isAValidUrl(url)) {
       throw new Error('Invalid URL provided');
     }
