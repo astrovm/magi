@@ -11,7 +11,7 @@ type FormInputs = {
   url: string;
 };
 
-const isString = (value: FormDataEntryValue | null): value is string => typeof value === 'string';
+const isString = (value: unknown): value is string => typeof value === 'string';
 
 const parseFormInputs = (formFields: FormData): FormInputs | null => {
   const aliasField = formFields.get('alias');

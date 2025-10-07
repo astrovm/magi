@@ -3,19 +3,20 @@
   "description": "A wizard worm that powers an orb.",
   "author": "4st.li",
   "scripts": {
-    "start": "npx wrangler pages dev ./public --kv links",
-    "lint": "npx eslint .",
-    "lint-fix": "npx eslint . --fix"
+    "start": "bunx wrangler pages dev ./public --kv links",
+    "lint": "bunx eslint .",
+    "lint-fix": "bunx eslint . --fix"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20250927.0",
+    "@cloudflare/workers-types": "^4.20251004.0",
     "@typescript-eslint/eslint-plugin": "^7.18.0",
-    "@typescript-eslint/parser": "^8.44.1",
+    "@typescript-eslint/parser": "^8.46.0",
     "eslint": "^8.57.1",
     "eslint-config-airbnb": "^19.0.4",
     "eslint-config-airbnb-typescript": "^18.0.0",
     "typescript": "~5.5.4",
-    "wrangler": "^4.40.2"
+    "wrangler": "^4.42.1"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "packageManager": "bun@1.1.34"
 }
