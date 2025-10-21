@@ -1,6 +1,7 @@
 import type { KVNamespace, PagesFunction } from '@cloudflare/workers-types';
 import Alias from '../modules/aliasClass';
 import Url from '../modules/urlClass';
+import { isString } from '../modules/typeGuards';
 
 type Env = {
   links: KVNamespace;
@@ -10,8 +11,6 @@ type FormInputs = {
   alias: string;
   url: string;
 };
-
-const isString = (value: unknown): value is string => typeof value === 'string';
 
 const parseFormInputs = (formFields: FormData): FormInputs | null => {
   const aliasField = formFields.get('alias');
