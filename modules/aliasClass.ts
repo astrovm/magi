@@ -27,8 +27,20 @@ export default class Alias {
     return hasSpecialChars(this.alias);
   }
 
-  decode(): void {
-    this.alias = decodeURIComponent(this.alias);
+  decode(): boolean {
+    const originalAlias = this.alias;
+
+    try {
+      this.alias = decodeURIComponent(this.alias);
+      return true;
+    } catch (error) {
+      if (error instanceof URIError) {
+        this.alias = originalAlias;
+        return false;
+      }
+
+      throw error;
+    }
   }
 
   normalize(): string {
