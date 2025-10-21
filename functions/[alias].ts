@@ -1,11 +1,10 @@
 import type { KVNamespace, PagesFunction } from '@cloudflare/workers-types';
 import Alias from '../modules/aliasClass';
+import { isString } from '../modules/typeGuards';
 
 type Env = {
   links: KVNamespace;
 };
-
-const isString = (value: string | string[] | undefined): value is string => typeof value === 'string';
 
 const getAliasParam = (params: Record<'alias', string | string[] | undefined>): string | null => {
   const aliasParam = params.alias;
