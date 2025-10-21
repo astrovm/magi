@@ -23,11 +23,11 @@ export const onRequestGet: PagesFunction<Env, 'alias'> = async ({ env, params, r
   }
 
   const alias = new Alias(aliasParam);
+  alias.normalize();
   if (alias.includes('.')) {
     return env.ASSETS.fetch(request);
   }
 
-  alias.decode();
   alias.replaceSpacesWith('-');
   const aliasHash = await alias.getHash();
 
