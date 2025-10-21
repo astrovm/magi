@@ -36,6 +36,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, request }) => {
 
   const { alias: aliasField, url: urlField } = inputs;
   const alias = new Alias(aliasField);
+  alias.normalize();
   alias.replaceSpacesWith('-');
   if (alias.lengthIsGreaterThan(13312) || alias.includes('.') || alias.hasSpecialChars()) {
     return new Response('<p>the orb rejected your alias.</p>');

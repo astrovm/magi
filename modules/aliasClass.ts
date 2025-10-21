@@ -31,6 +31,12 @@ export default class Alias {
     this.alias = decodeURIComponent(this.alias);
   }
 
+  normalize(): string {
+    this.decode();
+    this.alias = this.alias.replace(/\s+/g, ' ').trim();
+    return this.alias;
+  }
+
   async getHash(): Promise<string> {
     const lowerCaseAlias = this.alias.toLowerCase();
     return hashText(lowerCaseAlias);
