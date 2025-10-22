@@ -10,34 +10,41 @@ export default class Alias extends StringValue {
     this.value = this.value.replace(/\s/g, char);
   }
 
-  includes(char: string): boolean {
-    return this.value.includes(char);
+  hasDot(): boolean {
+    return this.value.includes('.');
   }
 
   hasSpecialChars(): boolean {
     return hasSpecialChars(this.value);
   }
 
-  decode(): boolean {
+  decode(): this {
     const originalAlias = this.value;
 
     try {
       this.value = decodeURIComponent(this.value);
-      return true;
     } catch (error) {
       if (error instanceof URIError) {
         this.value = originalAlias;
-        return false;
+      } else {
+        throw error;
       }
-
-      throw error;
     }
+
+    return this;
   }
 
-  normalize(): string {
+  normalize(): this {
     this.decode();
     this.value = this.value.replace(/\s+/g, ' ').trim();
-    return this.value;
+    return this;
+  }
+
+  prepareForLookup(slugChar: string): { hasDot: boolean } {
+    this.normalize();
+    const hasDot = this.hasDot();
+    this.replaceSpacesWith(slugChar);
+    return { hasDot };
   }
 
   async getHash(): Promise<string> {

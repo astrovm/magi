@@ -13,7 +13,4 @@ export default class Url extends StringValue {
     }
   }
 
-  isValid(): boolean {
-    return isAValidUrl(this.value);
-  }
 }

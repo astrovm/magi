@@ -5,7 +5,8 @@
   "scripts": {
     "start": "bunx wrangler pages dev ./public --kv links",
     "lint": "bunx eslint .",
-    "lint-fix": "bunx eslint . --fix"
+    "lint-fix": "bunx eslint . --fix",
+    "tsc": "bunx tsc --noEmit"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20251014.0",

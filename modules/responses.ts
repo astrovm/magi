@@ -24,19 +24,24 @@ type ResponseContext = {
 
 type ResponseBuilder = (context?: ResponseContext) => Response;
 
-const createHtmlResponse = (message: string): Response =>
-  new Response(`<p>${message}</p>`, { headers: HTML_HEADERS });
+type ResponseFormatter = (message: string) => string;
 
-const createTextResponse = (message: string): Response =>
-  new Response(`${message}\n`, { headers: TEXT_HEADERS });
+const formatAsHtml: ResponseFormatter = (message) => `<p>${message}</p>`;
+const formatAsText: ResponseFormatter = (message) => `${message}\n`;
+
+const createResponse = (
+  message: string,
+  formatter: ResponseFormatter,
+  headers: HeadersInit,
+): Response => new Response(formatter(message), { headers });
 
 const RESPONSE_BUILDERS: Record<ResponseKey, ResponseBuilder> = {
-  invalidRequestHtml: () => createHtmlResponse(ORB_REJECTED_REQUEST_MESSAGE),
-  invalidRequestText: () => createTextResponse(ORB_REJECTED_REQUEST_MESSAGE),
-  invalidAlias: () => createHtmlResponse(ORB_REJECTED_ALIAS_MESSAGE),
-  invalidUrl: () => createHtmlResponse(ORB_REJECTED_INVALID_URL_MESSAGE),
-  aliasLocked: () => createHtmlResponse(ORB_REJECTED_ALIAS_REWRITE_MESSAGE),
-  linkNotFound: () => createTextResponse(ORB_LINK_NOT_FOUND_MESSAGE),
+  invalidRequestHtml: () => createResponse(ORB_REJECTED_REQUEST_MESSAGE, formatAsHtml, HTML_HEADERS),
+  invalidRequestText: () => createResponse(ORB_REJECTED_REQUEST_MESSAGE, formatAsText, TEXT_HEADERS),
+  invalidAlias: () => createResponse(ORB_REJECTED_ALIAS_MESSAGE, formatAsHtml, HTML_HEADERS),
+  invalidUrl: () => createResponse(ORB_REJECTED_INVALID_URL_MESSAGE, formatAsHtml, HTML_HEADERS),
+  aliasLocked: () => createResponse(ORB_REJECTED_ALIAS_REWRITE_MESSAGE, formatAsHtml, HTML_HEADERS),
+  linkNotFound: () => createResponse(ORB_LINK_NOT_FOUND_MESSAGE, formatAsText, TEXT_HEADERS),
   linkCreated: (context?: ResponseContext) => {
     const alias = context?.alias;
 
@@ -44,7 +49,7 @@ const RESPONSE_BUILDERS: Record<ResponseKey, ResponseBuilder> = {
       throw new Error('The linkCreated response requires an alias.');
     }
 
-    return createHtmlResponse(WORM_LINK_CREATED_MESSAGE(alias));
+    return createResponse(WORM_LINK_CREATED_MESSAGE(alias), formatAsHtml, HTML_HEADERS);
   },
 };
 
@@ -52,6 +57,7 @@ const getResponse = (key: ResponseKey, context?: ResponseContext): Response =>
   RESPONSE_BUILDERS[key](context);
 
 export {
+  createResponse,
   getResponse,
   ORB_REJECTED_INVALID_URL_MESSAGE,
   ORB_REJECTED_REQUEST_MESSAGE,
