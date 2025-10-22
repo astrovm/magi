@@ -1,6 +1,7 @@
 import type { KVNamespace, PagesFunction } from '@cloudflare/workers-types';
 import Alias from '../modules/aliasClass';
 import Url from '../modules/urlClass';
+import { LINK_CACHE_TTL } from '../modules/commonFunctions';
 import { isString } from '../modules/typeGuards';
 
 type Env = {
@@ -55,7 +56,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, request }) => {
 
   const aliasHash = await alias.getHash();
 
-  const existingValue = await env.links.get(aliasHash, { cacheTtl: 86400 });
+  const existingValue = await env.links.get(aliasHash, { cacheTtl: LINK_CACHE_TTL });
   if (existingValue !== null) {
     return new Response('<p>the orb rejected your access to rewrite this link.</p>');
   }
