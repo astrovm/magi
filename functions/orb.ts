@@ -2,6 +2,7 @@ import type { KVNamespace, PagesFunction } from '@cloudflare/workers-types';
 import Alias from '../modules/aliasClass';
 import Url from '../modules/urlClass';
 import { LINK_CACHE_TTL } from '../modules/commonFunctions';
+import { getResponse } from '../modules/responses';
 import { isString } from '../modules/typeGuards';
 
 type Env = {
@@ -32,7 +33,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, request }) => {
   const inputs = parseFormInputs(formFields);
 
   if (!inputs) {
-    return new Response('<p>the orb rejected your request.</p>');
+    return getResponse('invalidRequestHtml');
   }
 
   const { alias: aliasField, url: urlField } = inputs;
@@ -40,30 +41,28 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, request }) => {
   alias.normalize();
   alias.replaceSpacesWith('-');
   if (alias.lengthIsGreaterThan(13312) || alias.includes('.') || alias.hasSpecialChars()) {
-    return new Response('<p>the orb rejected your alias.</p>');
+    return getResponse('invalidAlias');
   }
 
   let url: Url;
   try {
     url = new Url(urlField);
   } catch (error) {
-    return new Response('<p>the orb rejected your invalid url.</p>');
+    return getResponse('invalidUrl');
   }
 
   if (url.lengthIsGreaterThan(2048) || !url.isValid()) {
-    return new Response('<p>the orb rejected your invalid url.</p>');
+    return getResponse('invalidUrl');
   }
 
   const aliasHash = await alias.getHash();
 
   const existingValue = await env.links.get(aliasHash, { cacheTtl: LINK_CACHE_TTL });
   if (existingValue !== null) {
-    return new Response('<p>the orb rejected your access to rewrite this link.</p>');
+    return getResponse('aliasLocked');
   }
 
   const storedAlias = alias.get();
   await env.links.put(aliasHash, url.get());
-  return new Response(
-    `<p>the worm summoned your link <a href="https://s.4st.li/${storedAlias}">s.4st.li/${storedAlias}</a></p>`,
-  );
+  return getResponse('linkCreated', { alias: storedAlias });
 };

@@ -1,6 +1,7 @@
 import type { KVNamespace, PagesFunction } from '@cloudflare/workers-types';
 import Alias from '../modules/aliasClass';
 import { LINK_CACHE_TTL } from '../modules/commonFunctions';
+import { getResponse } from '../modules/responses';
 import { isString } from '../modules/typeGuards';
 
 type Env = {
@@ -20,7 +21,7 @@ export const onRequestGet: PagesFunction<Env, 'alias'> = async ({ env, params, r
   const aliasParam = getAliasParam(params);
 
   if (!aliasParam) {
-    return new Response('the orb rejected your request.\n');
+    return getResponse('invalidRequestText');
   }
 
   const alias = new Alias(aliasParam);
@@ -34,7 +35,7 @@ export const onRequestGet: PagesFunction<Env, 'alias'> = async ({ env, params, r
 
   const destinationURL = await env.links.get(aliasHash, { cacheTtl: LINK_CACHE_TTL });
   if (destinationURL === null) {
-    return new Response('the orb didn\'t found this link.\n');
+    return getResponse('linkNotFound');
   }
 
   const statusCode = 301;
