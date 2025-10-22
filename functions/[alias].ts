@@ -1,20 +1,13 @@
-import type { KVNamespace, PagesFunction } from '@cloudflare/workers-types';
+import type { PagesFunction } from '@cloudflare/workers-types';
 import Alias from '../modules/aliasClass';
-import { LINK_CACHE_TTL } from '../modules/commonFunctions';
+import type { Env } from '../modules/cloudflareEnv';
+import { getCachedLink } from '../modules/kvHelpers';
 import { getResponse } from '../modules/responses';
-import { isString } from '../modules/typeGuards';
-
-type Env = {
-  links: KVNamespace;
-};
+import { readStringField } from '../modules/requestParsers';
 
 const getAliasParam = (params: Record<'alias', string | string[] | undefined>): string | null => {
   const aliasParam = params.alias;
-  if (isString(aliasParam)) {
-    return aliasParam;
-  }
-
-  return null;
+  return readStringField(aliasParam);
 };
 
 export const onRequestGet: PagesFunction<Env, 'alias'> = async ({ env, params, request }) => {
@@ -25,15 +18,13 @@ export const onRequestGet: PagesFunction<Env, 'alias'> = async ({ env, params, r
   }
 
   const alias = new Alias(aliasParam);
-  alias.normalize();
-  if (alias.includes('.')) {
+  const { hasDot } = alias.prepareForLookup('-');
+  if (hasDot) {
     return env.ASSETS.fetch(request);
   }
 
-  alias.replaceSpacesWith('-');
   const aliasHash = await alias.getHash();
-
-  const destinationURL = await env.links.get(aliasHash, { cacheTtl: LINK_CACHE_TTL });
+  const destinationURL = await getCachedLink(env.links, aliasHash);
   if (destinationURL === null) {
     return getResponse('linkNotFound');
   }

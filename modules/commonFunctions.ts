@@ -1,8 +1,14 @@
 /**
- * Time-to-live in seconds for cached alias lookups in KV storage.
- * Update this value to adjust how long link resolutions stay cached.
+ * Maximum number of characters accepted for aliases provided by users.
+ * Update this value to adjust how large alias strings may be.
  */
-export const LINK_CACHE_TTL = 86400;
+export const MAX_ALIAS_LENGTH = 13312;
+
+/**
+ * Maximum number of characters accepted for URLs provided by users.
+ * Update this value to adjust the supported URL length.
+ */
+export const MAX_URL_LENGTH = 2048;
 
 export const isAValidUrl = (input: string): boolean => {
   try {

@@ -1,13 +1,11 @@
-import type { KVNamespace, PagesFunction } from '@cloudflare/workers-types';
+import type { PagesFunction } from '@cloudflare/workers-types';
 import Alias from '../modules/aliasClass';
+import type { Env } from '../modules/cloudflareEnv';
 import Url from '../modules/urlClass';
-import { LINK_CACHE_TTL } from '../modules/commonFunctions';
+import { MAX_ALIAS_LENGTH, MAX_URL_LENGTH } from '../modules/commonFunctions';
+import { getCachedLink } from '../modules/kvHelpers';
 import { getResponse } from '../modules/responses';
-import { isString } from '../modules/typeGuards';
-
-type Env = {
-  links: KVNamespace;
-};
+import { readStringField } from '../modules/requestParsers';
 
 type FormInputs = {
   alias: string;
@@ -15,10 +13,10 @@ type FormInputs = {
 };
 
 const parseFormInputs = (formFields: FormData): FormInputs | null => {
-  const aliasField = formFields.get('alias');
-  const urlField = formFields.get('url');
+  const aliasField = readStringField(formFields.get('alias'));
+  const urlField = readStringField(formFields.get('url'));
 
-  if (isString(aliasField) && isString(urlField)) {
+  if (aliasField !== null && urlField !== null) {
     return {
       alias: aliasField,
       url: urlField,
@@ -38,9 +36,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, request }) => {
 
   const { alias: aliasField, url: urlField } = inputs;
   const alias = new Alias(aliasField);
-  alias.normalize();
-  alias.replaceSpacesWith('-');
-  if (alias.lengthIsGreaterThan(13312) || alias.includes('.') || alias.hasSpecialChars()) {
+  const { hasDot } = alias.prepareForLookup('-');
+  if (alias.lengthIsGreaterThan(MAX_ALIAS_LENGTH) || hasDot || alias.hasSpecialChars()) {
     return getResponse('invalidAlias');
   }
 
@@ -51,13 +48,13 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, request }) => {
     return getResponse('invalidUrl');
   }
 
-  if (url.lengthIsGreaterThan(2048) || !url.isValid()) {
+  if (url.lengthIsGreaterThan(MAX_URL_LENGTH)) {
     return getResponse('invalidUrl');
   }
 
   const aliasHash = await alias.getHash();
 
-  const existingValue = await env.links.get(aliasHash, { cacheTtl: LINK_CACHE_TTL });
+  const existingValue = await getCachedLink(env.links, aliasHash);
   if (existingValue !== null) {
     return getResponse('aliasLocked');
   }
