@@ -1,3 +1,9 @@
+/**
+ * Time-to-live in seconds for cached alias lookups in KV storage.
+ * Update this value to adjust how long link resolutions stay cached.
+ */
+export const LINK_CACHE_TTL = 86400;
+
 export const isAValidUrl = (input: string): boolean => {
   try {
     const url = new URL(input);

@@ -1,5 +1,6 @@
 import type { KVNamespace, PagesFunction } from '@cloudflare/workers-types';
 import Alias from '../modules/aliasClass';
+import { LINK_CACHE_TTL } from '../modules/commonFunctions';
 import { isString } from '../modules/typeGuards';
 
 type Env = {
@@ -31,7 +32,7 @@ export const onRequestGet: PagesFunction<Env, 'alias'> = async ({ env, params, r
   alias.replaceSpacesWith('-');
   const aliasHash = await alias.getHash();
 
-  const destinationURL = await env.links.get(aliasHash, { cacheTtl: 86400 });
+  const destinationURL = await env.links.get(aliasHash, { cacheTtl: LINK_CACHE_TTL });
   if (destinationURL === null) {
     return new Response('the orb didn\'t found this link.\n');
   }
