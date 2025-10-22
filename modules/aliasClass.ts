@@ -1,41 +1,32 @@
 import { hasSpecialChars, hashText } from './commonFunctions';
+import StringValue from './stringValue';
 
-export default class Alias {
-  private alias: string;
-
+export default class Alias extends StringValue {
   constructor(alias: string) {
-    this.alias = alias;
-  }
-
-  get(): string {
-    return this.alias;
+    super(alias);
   }
 
   replaceSpacesWith(char: string): void {
-    this.alias = this.alias.replace(/\s/g, char);
-  }
-
-  lengthIsGreaterThan(length: number): boolean {
-    return this.alias.length > length;
+    this.value = this.value.replace(/\s/g, char);
   }
 
   includes(char: string): boolean {
-    return this.alias.includes(char);
+    return this.value.includes(char);
   }
 
   hasSpecialChars(): boolean {
-    return hasSpecialChars(this.alias);
+    return hasSpecialChars(this.value);
   }
 
   decode(): boolean {
-    const originalAlias = this.alias;
+    const originalAlias = this.value;
 
     try {
-      this.alias = decodeURIComponent(this.alias);
+      this.value = decodeURIComponent(this.value);
       return true;
     } catch (error) {
       if (error instanceof URIError) {
-        this.alias = originalAlias;
+        this.value = originalAlias;
         return false;
       }
 
@@ -45,16 +36,12 @@ export default class Alias {
 
   normalize(): string {
     this.decode();
-    this.alias = this.alias.replace(/\s+/g, ' ').trim();
-    return this.alias;
+    this.value = this.value.replace(/\s+/g, ' ').trim();
+    return this.value;
   }
 
   async getHash(): Promise<string> {
-    const lowerCaseAlias = this.alias.toLowerCase();
+    const lowerCaseAlias = this.value.toLowerCase();
     return hashText(lowerCaseAlias);
-  }
-
-  toString(): string {
-    return this.alias;
   }
 }

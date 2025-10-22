@@ -1,11 +1,10 @@
 import { isAValidUrl } from './commonFunctions';
+import StringValue from './stringValue';
 
-export default class Url {
-  private url: string;
-
+export default class Url extends StringValue {
   constructor(url: string) {
     Url.validate(url);
-    this.url = url;
+    super(url);
   }
 
   private static validate(url: string): void {
@@ -14,19 +13,7 @@ export default class Url {
     }
   }
 
-  get(): string {
-    return this.url;
-  }
-
   isValid(): boolean {
-    return isAValidUrl(this.url);
-  }
-
-  lengthIsGreaterThan(length: number): boolean {
-    return this.url.length > length;
-  }
-
-  toString(): string {
-    return this.url;
+    return isAValidUrl(this.value);
   }
 }
