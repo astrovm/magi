@@ -44,7 +44,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, request }) => {
   let url: Url;
   try {
     url = new Url(urlField);
-  } catch (error) {
+  } catch {
     return getResponse('invalidUrl');
   }
 
