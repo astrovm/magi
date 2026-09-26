@@ -8,5 +8,9 @@
         "types": [
             "@cloudflare/workers-types"
         ]
-    }
+    },
+    "include": [
+        "functions/**/*.ts",
+        "modules/**/*.ts"
+    ]
 }
