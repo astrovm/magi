@@ -10,14 +10,14 @@
     "test": "bun test --coverage"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20260927.1",
+    "@cloudflare/workers-types": "^5.20260930.1",
     "@eslint/js": "^10.0.1",
     "@types/bun": "^1.4.2",
-    "@typescript-eslint/eslint-plugin": "^8.70.1",
-    "@typescript-eslint/parser": "^8.70.1",
+    "@typescript-eslint/eslint-plugin": "^8.71.0",
+    "@typescript-eslint/parser": "^8.71.0",
     "eslint": "^10.11.0",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
-    "wrangler": "^4.141.0",
+    "wrangler": "^4.144.0",
     "@typescript/native": "npm:typescript@~7.0.2"
   },
   "license": "MIT",
