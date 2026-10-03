@@ -57,7 +57,7 @@ const visit = async (context: Context, lookup: Lookup, record: LinkRecord): Prom
   }
   if (tracked) {
     const shortLink = `${new URL(request.url).host}/${alias}`;
-    context.waitUntil(recordVisit({ env, alias, aliasHash, record, shortLink, target, request }));
+    context.waitUntil(recordVisit({ env, aliasHash, record, shortLink, target, request }));
   }
   return meta.wait ? countdownPage(target) : redirectTo(target, !tracked);
 };

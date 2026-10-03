@@ -51,11 +51,6 @@ const parseSpells = (formFields: FormData, now: number): Spells | null => {
   if (formFields.get('wait') === 'on') {
     spells.wait = true;
   }
-  if (formFields.get('hall') === 'on') {
-    // The hall ranks links by visits, so it needs the counter.
-    spells.hall = true;
-    spells.count = true;
-  }
 
   return spells;
 };

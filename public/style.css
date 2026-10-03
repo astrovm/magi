@@ -586,41 +586,6 @@ textarea {
   animation: pulse 0.8s ease-in-out infinite;
 }
 
-/* hall of fame */
-
-.hall {
-  list-style: none;
-  margin: 16px 0 20px;
-  padding: 0;
-  text-align: left;
-}
-
-.hall li {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 14px;
-  border-radius: 14px;
-  background: var(--field);
-  margin-bottom: 8px;
-}
-
-.hall a {
-  flex: 1;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.hall .rank {
-  width: 2em;
-  text-align: center;
-}
-
-.hall .clicks {
-  font-weight: 700;
-  color: var(--gold);
-}
-
 /* preview */
 
 .facts {

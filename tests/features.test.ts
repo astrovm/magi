@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, mock, spyOn, test } from 'bun:test';
 import { onRequestGet, onRequestHead, onRequestPost as postAlias } from '../functions/[alias]';
-import { onRequestGet as getHallHandler } from '../functions/hall';
 import { onRequestPost as postManage } from '../functions/manage';
 import { onRequestGet as getOrbHandler, onRequestPost as postOrbHandler } from '../functions/orb';
 import {
@@ -14,7 +13,7 @@ import {
   TURNSTILE_VERIFY_URL,
   UNLOCK_LIMIT,
 } from '../modules/guards';
-import { deleteLink, getLink, hallKey, listHall, putHallEntry, putLink } from '../modules/kvHelpers';
+import { deleteLink, getLink, putLink } from '../modules/kvHelpers';
 import { MAX_FORTUNES, parseFortunes } from '../modules/linkInput';
 import { COUNTDOWN_SECONDS } from '../modules/pages';
 import { hashPassword } from '../modules/secrets';
@@ -38,7 +37,6 @@ const unlockAlias = postAlias as unknown as Handler;
 const getOrb = getOrbHandler as unknown as Handler;
 const postOrb = postOrbHandler as unknown as Handler;
 const manage = postManage as unknown as Handler;
-const getHall = getHallHandler as unknown as Handler;
 
 const asKv = (kv: MemoryKV) => kv as unknown as Parameters<typeof getLink>[0];
 
@@ -96,7 +94,6 @@ describe('GET /orb', () => {
     expect(await status('Fresh Spell')).toEqual({ status: 'free', alias: 'Fresh-Spell' });
     expect(await status('TAKEN')).toEqual({ status: 'taken' });
     expect(await status('no.dots')).toEqual({ status: 'invalid' });
-    expect(await status('hall')).toEqual({ status: 'invalid' });
     expect(await status('  ')).toEqual({ status: 'invalid' });
   });
 });
@@ -297,62 +294,20 @@ describe('countdown links', () => {
   });
 });
 
-describe('hall of fame', () => {
-  test('ranks opted-in links by visits', async () => {
+describe('countdown preview', () => {
+  test('previews the countdown spell', async () => {
     const env = makeEnv();
-    await create(env, { url: 'https://example.com/a', alias: 'popular', hall: 'on' });
-    await create(env, { url: 'https://example.com/b', alias: 'shy', hall: 'on' });
-    await create(env, { url: 'https://example.com/c', alias: 'private', count: 'on' });
-    expect(env.links.metadata.get(md5('popular'))).toMatchObject({ hall: true, count: true });
-
-    for (const [alias, visits] of [['popular', 3], ['shy', 1], ['private', 5]] as const) {
-      for (let index = 0; index < visits; index += 1) {
-        const { context, pending } = visitContext(env, alias);
-        await getAlias(context);
-        await Promise.all(pending);
-      }
-    }
-
-    const response = await getHall({ env, request: new Request(`${HOST}/hall`) });
-    const html = await response.text();
-    expect(response.headers.get('Cache-Control')).toBe('public, max-age=600');
-    expect(html).toContain('🥇</span><a href="/popular+">s.4st.li/popular</a><span class="clicks">3</span>');
-    expect(html).toContain('🥈</span><a href="/shy+">s.4st.li/shy</a><span class="clicks">1</span>');
-    expect(html).not.toContain('private');
+    storeLink(env, 'slowpoke', 'https://example.com', { wait: true });
+    const html = await (await getAlias(visitContext(env, 'slowpoke+').context)).text();
+    expect(html).toContain('seconds of suspense');
   });
 
-  test('shows an empty hall', async () => {
-    const html = await (await getHall({ env: makeEnv(), request: new Request(`${HOST}/hall`) })).text();
-    expect(html).toContain('the hall is empty');
-  });
-
-  test('numbers places past the podium and caps the list', async () => {
+  test('drops the visit counter on banish', async () => {
     const kv = new MemoryKV();
-    for (let index = 0; index < 25; index += 1) {
-      await putHallEntry(asKv(kv), `hash${index}`, { alias: `link-${index}`, clicks: index }, {});
-    }
-    kv.store.set(hallKey('broken'), '');
-    const entries = await listHall(asKv(kv), 20);
-    expect(entries).toHaveLength(20);
-    expect(entries[0]).toEqual({ alias: 'link-24', clicks: 24 });
-    const html = await (await getHall({ env: { links: kv }, request: new Request(`${HOST}/hall`) })).text();
-    expect(html).toContain('<span class="rank">4.</span>');
-  });
-
-  test('expires hall entries with their link and drops them on banish', async () => {
-    const kv = new MemoryKV();
-    await putHallEntry(asKv(kv), 'abc', { alias: 'a', clicks: 1 }, { exp: 99 });
-    expect(kv.putCalls[0].options).toEqual({ expiration: 99, metadata: { a: 'a', c: 1 } });
+    kv.store.set('abc', 'https://example.com');
+    kv.store.set('clicks:abc', '3');
     await deleteLink(asKv(kv), 'abc');
     expect(kv.store.size).toBe(0);
-  });
-
-  test('previews hall and countdown spells', async () => {
-    const env = makeEnv();
-    storeLink(env, 'famous', 'https://example.com', { hall: true, wait: true });
-    const html = await (await getAlias(visitContext(env, 'famous+').context)).text();
-    expect(html).toContain('href="/hall"');
-    expect(html).toContain('seconds of suspense');
   });
 });
 
@@ -366,15 +321,6 @@ describe('precise self-destruct', () => {
     expect(response.status).toBe(404);
     await Promise.all(pending);
     expect(env.links.store.has(md5('boom'))).toBe(false);
-  });
-
-  test('skips the hall when the last visit burns the link', async () => {
-    const env = makeEnv();
-    storeLink(env, 'flash', 'https://example.com', { max: 1, hall: true, count: true });
-    const { context, pending } = visitContext(env, 'flash');
-    await getAlias(context);
-    await Promise.all(pending);
-    expect(env.links.store.has(hallKey(md5('flash')))).toBe(false);
   });
 });
 

@@ -19,7 +19,6 @@ It shrinks links. Mostly.
 - **Telegram alerts**: get a message with the city, country and browser of each visit. No IPs.
 - **Fortune cookie**: each visit goes to a random link from your list.
 - **Countdown**: visitors wait 5 seconds while the worm charges the orb.
-- **Hall of fame**: opt in and compete for the most visits at `/hall`.
 - **QR code** for every new link.
 - **My links**: your links and manage keys, saved only in your browser.
 - Poke the worm. Leave it alone and it falls asleep. Try the Konami code. Visit in October or December.
