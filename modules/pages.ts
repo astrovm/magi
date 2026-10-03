@@ -1,10 +1,14 @@
 import { escapeHtml, renderPage } from './html';
-import type { LinkRecord } from './kvHelpers';
+import type { HallEntry, LinkRecord } from './kvHelpers';
 import { ORB_LINK_NOT_FOUND_MESSAGE, orbMessage } from './responses';
 
 const PRIVATE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 const WRONG_PASSWORD_MESSAGE = 'wrong password. the worm is disappointed in you.';
+const LOCKED_OUT_MESSAGE = 'too many wrong guesses. the worm needs 15 minutes alone.';
+
+/** Seconds a countdown link makes the visitor wait. */
+const COUNTDOWN_SECONDS = 5;
 
 const formatDate = (epochMs: number): string => new Date(epochMs).toISOString().slice(0, 10);
 
@@ -21,9 +25,17 @@ ${orbMessage(ORB_LINK_NOT_FOUND_MESSAGE, 'error')}
     { status: 404, title: 'lost', headers: PRIVATE_HEADERS },
   );
 
-const unlockPage = (alias: string, wrongPassword = false): Response => {
+type UnlockState = 'ask' | 'wrong' | 'locked';
+
+const UNLOCK_STATES: Record<UnlockState, { status: number; error: string }> = {
+  ask: { status: 200, error: '' },
+  wrong: { status: 403, error: orbMessage(WRONG_PASSWORD_MESSAGE, 'error') },
+  locked: { status: 429, error: orbMessage(LOCKED_OUT_MESSAGE, 'error') },
+};
+
+const unlockPage = (alias: string, state: UnlockState = 'ask'): Response => {
   const safeAlias = escapeHtml(alias);
-  const error = wrongPassword ? orbMessage(WRONG_PASSWORD_MESSAGE, 'error') : '';
+  const { status, error } = UNLOCK_STATES[state];
   return renderPage(
     `<img src="/orb.webp" alt="" class="card-art card-art--orb" />
 <h1 class="card-title">🔒 this link is guarded</h1>
@@ -33,7 +45,7 @@ const unlockPage = (alias: string, wrongPassword = false): Response => {
   <button type="submit" class="btn">Unlock</button>
 </form>
 ${error}`,
-    { status: wrongPassword ? 403 : 200, title: 'guarded', headers: PRIVATE_HEADERS },
+    { status, title: 'guarded', headers: PRIVATE_HEADERS },
   );
 };
 
@@ -47,11 +59,14 @@ type PreviewDetails = {
 const fact = (label: string, value: string): string => `<dt>${label}</dt><dd>${value}</dd>`;
 
 const previewPage = ({ alias, host, record, clicks }: PreviewDetails): Response => {
-  const { url, meta } = record;
+  const { meta } = record;
   const safeAlias = escapeHtml(alias);
+  const destinations = [record.url, ...(record.more ?? [])]
+    .map((url) => `<a href="${escapeHtml(url)}" rel="noopener noreferrer nofollow" class="long-url">${escapeHtml(url)}</a>`)
+    .join('<br />');
   const destination = meta.pw
     ? fact('goes to', '🔒 a secret. the orb is sworn to silence.')
-    : fact('goes to', `<a href="${escapeHtml(url)}" rel="noopener noreferrer nofollow" class="long-url">${escapeHtml(url)}</a>`);
+    : fact(record.more ? '🥠 goes to one of' : 'goes to', destinations);
   const facts = [
     destination,
     meta.created ? fact('born', formatDate(meta.created)) : '',
@@ -60,6 +75,8 @@ const previewPage = ({ alias, host, record, clicks }: PreviewDetails): Response 
     meta.exp ? fact('expires', formatDateTime(meta.exp * 1000)) : '',
     meta.cursed ? fact('curse', '☠️ might rickroll you') : '',
     meta.tg ? fact('snitch', '📡 the owner gets visit alerts') : '',
+    meta.wait ? fact('countdown', `⏳ ${COUNTDOWN_SECONDS} seconds of suspense`) : '',
+    meta.hall ? fact('fame', '🏆 on the <a href="/hall">hall of fame</a>') : '',
   ].join('');
 
   return renderPage(
@@ -71,5 +88,55 @@ const previewPage = ({ alias, host, record, clicks }: PreviewDetails): Response 
   );
 };
 
-export { notFoundPage, previewPage, PRIVATE_HEADERS, unlockPage, WRONG_PASSWORD_MESSAGE };
-export type { PreviewDetails };
+/**
+ * Makes the visitor wait while the worm "charges the orb". Works without JS
+ * through the refresh header; the page script animates the count.
+ */
+const countdownPage = (target: string): Response => {
+  const safeTarget = escapeHtml(target);
+  return renderPage(
+    `<div class="countdown" data-target="${safeTarget}">
+<img src="/orb.webp" alt="" class="card-art card-art--orb card-art--charging" />
+<h1 class="card-title">⚡ charging the orb</h1>
+<p class="countdown-number" data-countdown>${COUNTDOWN_SECONDS}</p>
+<a href="${safeTarget}" rel="noopener noreferrer nofollow" class="hint">skip the suspense</a>
+</div>`,
+    {
+      title: 'charging',
+      headers: { ...PRIVATE_HEADERS, Refresh: `${COUNTDOWN_SECONDS}; url=${target}` },
+    },
+  );
+};
+
+const hallPage = (entries: HallEntry[], host: string): Response => {
+  const rows = entries
+    .map(({ alias, clicks }, index) => {
+      const medal = ['🥇', '🥈', '🥉'][index] ?? `${index + 1}.`;
+      const safeAlias = escapeHtml(alias);
+      return `<li><span class="rank">${medal}</span><a href="/${safeAlias}+">${escapeHtml(host)}/${safeAlias}</a><span class="clicks">${clicks}</span></li>`;
+    })
+    .join('');
+  const body = rows
+    ? `<ol class="hall">${rows}</ol>`
+    : '<p class="hint">the hall is empty. tick 🏆 when you summon a link to get in.</p>';
+  return renderPage(
+    `<h1 class="card-title">🏆 hall of fame</h1>
+<p class="hint">the most visited links that asked to be famous.</p>
+${body}
+<a href="/" class="btn">summon a contender</a>`,
+    { title: 'hall of fame', headers: { 'Cache-Control': 'public, max-age=600' } },
+  );
+};
+
+export {
+  COUNTDOWN_SECONDS,
+  countdownPage,
+  hallPage,
+  LOCKED_OUT_MESSAGE,
+  notFoundPage,
+  previewPage,
+  PRIVATE_HEADERS,
+  unlockPage,
+  WRONG_PASSWORD_MESSAGE,
+};
+export type { PreviewDetails, UnlockState };

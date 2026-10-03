@@ -7,7 +7,7 @@ import { MAX_ALIAS_LENGTH, MAX_URL_LENGTH } from '../modules/commonFunctions';
 import type { LinkMeta } from '../modules/kvHelpers';
 import { hashPassword } from '../modules/secrets';
 import { RICKROLL_URL } from '../modules/visits';
-import { MemoryKV, md5, sha256 } from './helpers';
+import { assetResponse, fetchSpy, formRequest, HOST, makeEnv, md5, sha256, storeLink, visitContext } from './helpers';
 
 type Handler = (context: unknown) => Promise<Response>;
 const getAlias = onRequestGet as unknown as Handler;
@@ -16,55 +16,6 @@ const unlockAlias = postAlias as unknown as Handler;
 const postOrb = postOrbHandler as unknown as Handler;
 const manage = postManage as unknown as Handler;
 const telegram = postTelegram as unknown as Handler;
-
-const assetResponse = new Response('asset');
-const HOST = 'https://s.4st.li';
-
-type TestEnv = {
-  links: MemoryKV;
-  ASSETS: { fetch: ReturnType<typeof mock> };
-  TELEGRAM_BOT_TOKEN?: string;
-  TELEGRAM_BOT_USERNAME?: string;
-  TELEGRAM_WEBHOOK_SECRET?: string;
-};
-
-const makeEnv = (extra: Partial<TestEnv> = {}): TestEnv => {
-  const links = new MemoryKV();
-  const fetch = mock(async () => assetResponse);
-  return { links, ASSETS: { fetch }, ...extra };
-};
-
-const storeLink = (env: TestEnv, alias: string, url: string, meta?: LinkMeta): void => {
-  env.links.store.set(md5(alias), url);
-  if (meta) {
-    env.links.metadata.set(md5(alias), meta);
-  }
-};
-
-const formRequest = (
-  path: string,
-  fields: Record<string, string | Blob>,
-  headers: Record<string, string> = { 'X-Orb': 'fragment' },
-): Request => {
-  const body = new FormData();
-  Object.entries(fields).forEach(([key, value]) => body.append(key, value));
-  return new Request(`${HOST}${path}`, { method: 'POST', body, headers });
-};
-
-const visitContext = (env: TestEnv, alias: string | string[] | undefined, request?: Request) => {
-  const pending: Promise<unknown>[] = [];
-  return {
-    pending,
-    context: {
-      env,
-      params: { alias },
-      request: request ?? new Request(`${HOST}/${typeof alias === 'string' ? alias : ''}`),
-      waitUntil: (promise: Promise<unknown>) => pending.push(promise),
-    },
-  };
-};
-
-const fetchSpy = () => spyOn(globalThis, 'fetch').mockImplementation(async () => new Response('{}'));
 
 afterEach(() => {
   mock.restore();
@@ -364,7 +315,7 @@ describe('POST /orb', () => {
     expect(meta).toMatchObject({ max: 3, exp: 1_800_003_600, cursed: true, count: true, created: 1_800_000_000_000 });
     expect(meta.pw).toMatch(/^[\w-]+\.[\w-]+$/);
     expect(JSON.stringify(meta)).not.toContain('hunter2');
-    expect(env.links.putCalls[0].options?.expiration).toBe(1_800_003_600);
+    expect(env.links.putCalls.find((call) => call.key === md5('spells'))?.options?.expiration).toBe(1_800_003_600);
   });
 
   test.each([
@@ -596,7 +547,7 @@ describe('POST /telegram', () => {
     expect(env.links.putCalls.at(-1)?.options?.expiration).toBe(2000000000);
     await telegram({ env, request: update(`/alert mine ${KEY}`) });
     expect(env.links.metadata.get(md5('mine'))).toEqual({ key: sha256(KEY), exp: 2000000000 });
-    expect(replies(fetch)).toEqual(['👀 watching Mine. i\'ll snitch on every visit.', '😴 stopped watching mine.']);
+    expect(replies(fetch)).toEqual(["👀 watching Mine. i'll snitch on every visit. give me a few minutes to wake up.", '😴 stopped watching mine.']);
   });
 
   test('refuses bad alert requests', async () => {

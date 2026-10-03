@@ -34,7 +34,7 @@ const toggleAlerts = async (env: Env, { chatId, args }: TelegramCommand): Promis
   const enable = tg !== chatId;
   await putLink(env.links, aliasHash, { url: record.url, meta: enable ? { ...meta, tg: chatId } : meta });
   return enable
-    ? `👀 watching ${alias.get()}. i'll snitch on every visit.`
+    ? `👀 watching ${alias.get()}. i'll snitch on every visit. give me a few minutes to wake up.`
     : `😴 stopped watching ${alias.get()}.`;
 };
 

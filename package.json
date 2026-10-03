@@ -1,14 +1,6 @@
 {
   "name": "magi",
-  "description": "A wizard worm that powers an orb.",
   "author": "4st.li",
-  "scripts": {
-    "start": "bunx wrangler pages dev ./public --kv links",
-    "lint": "bunx eslint .",
-    "lint-fix": "bunx eslint . --fix",
-    "tsc": "bunx tsc --noEmit",
-    "test": "bun test --coverage"
-  },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260930.1",
     "@eslint/js": "^10.0.1",
@@ -20,6 +12,14 @@
     "wrangler": "^4.144.0",
     "@typescript/native": "npm:typescript@~7.0.2"
   },
+  "description": "A wizard worm that powers an orb.",
   "license": "MIT",
-  "packageManager": "bun@1.4.2"
+  "packageManager": "bun@1.4.2",
+  "scripts": {
+    "start": "bunx wrangler pages dev ./public --kv links",
+    "lint": "bunx eslint .",
+    "lint-fix": "bunx eslint . --fix",
+    "tsc": "bunx tsc --noEmit",
+    "test": "bun test --coverage"
+  }
 }

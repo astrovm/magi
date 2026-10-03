@@ -13,7 +13,7 @@ export const MAX_URL_LENGTH = 2048;
 /**
  * Paths owned by functions, so they can't be used as aliases.
  */
-export const RESERVED_ALIASES = ['orb', 'manage', 'telegram'];
+export const RESERVED_ALIASES = ['orb', 'manage', 'telegram', 'hall'];
 
 export const isAValidUrl = (input: string): boolean => {
   try {

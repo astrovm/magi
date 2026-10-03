@@ -25,7 +25,7 @@ describe('commonFunctions', () => {
   test('exposes the input limits', () => {
     expect(MAX_ALIAS_LENGTH).toBe(13312);
     expect(MAX_URL_LENGTH).toBe(2048);
-    expect(RESERVED_ALIASES).toEqual(['orb', 'manage', 'telegram']);
+    expect(RESERVED_ALIASES).toEqual(['orb', 'manage', 'telegram', 'hall']);
   });
 
   test('adds https to scheme-less input', () => {
@@ -268,11 +268,20 @@ describe('visits', () => {
   });
 
   test('knows which links need every visit', () => {
-    expect(needsEveryVisit({})).toBe(false);
-    expect(needsEveryVisit({ created: 1, key: 'k', exp: 2 })).toBe(false);
-    for (const meta of [{ count: true }, { max: 1 }, { cursed: true }, { tg: 1 }, { pw: 'x' }]) {
-      expect(needsEveryVisit(meta)).toBe(true);
+    const url = 'https://example.com';
+    expect(needsEveryVisit({ url, meta: {} })).toBe(false);
+    expect(needsEveryVisit({ url, meta: { created: 1, key: 'k', exp: 2 } })).toBe(false);
+    for (const meta of [{ count: true }, { max: 1 }, { cursed: true }, { tg: 1 }, { pw: 'x' }, { wait: true }]) {
+      expect(needsEveryVisit({ url, meta })).toBe(true);
     }
+    expect(needsEveryVisit({ url, more: ['https://example.org'], meta: {} })).toBe(true);
+  });
+
+  test('picks fortune cookie destinations at random', () => {
+    const record = { url: 'https://a.example', more: ['https://b.example', 'https://c.example'], meta: {} };
+    expect(pickDestination(record, () => 0)).toBe('https://a.example');
+    expect(pickDestination(record, () => 0.5)).toBe('https://b.example');
+    expect(pickDestination(record, () => 0.99)).toBe('https://c.example');
   });
 
   test('builds cacheable and private redirects', () => {

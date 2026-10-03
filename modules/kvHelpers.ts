@@ -28,14 +28,27 @@ type LinkMeta = {
   exp?: number;
   /** Telegram chat that gets visit alerts. */
   tg?: number;
+  /** Show the visitor a countdown before redirecting. */
+  wait?: boolean;
+  /** List the link on the public hall of fame. */
+  hall?: boolean;
 };
 
 type LinkRecord = {
   url: string;
+  /** Extra fortune cookie destinations, picked at random with `url`. */
+  more?: string[];
   meta: LinkMeta;
 };
 
+type HallEntry = {
+  alias: string;
+  clicks: number;
+};
+
 const clicksKey = (aliasHash: string): string => `clicks:${aliasHash}`;
+const hallKey = (aliasHash: string): string => `hall:${aliasHash}`;
+const HALL_PREFIX = 'hall:';
 
 const getLink = async (links: KVNamespace, aliasHash: string): Promise<LinkRecord | null> => {
   const { value, metadata } = await links.getWithMetadata<LinkMeta>(aliasHash, {
@@ -44,17 +57,23 @@ const getLink = async (links: KVNamespace, aliasHash: string): Promise<LinkRecor
   if (value === null) {
     return null;
   }
-  return { url: value, meta: metadata ?? {} };
+  // Fortune cookie links store every destination, one per line.
+  const [url, ...more] = value.split('\n');
+  return more.length > 0 ? { url, more, meta: metadata ?? {} } : { url, meta: metadata ?? {} };
 };
 
 const putLink = (links: KVNamespace, aliasHash: string, record: LinkRecord): Promise<void> => {
   const { meta } = record;
   const options = meta.exp ? { expiration: meta.exp, metadata: meta } : { metadata: meta };
-  return links.put(aliasHash, record.url, options);
+  return links.put(aliasHash, [record.url, ...(record.more ?? [])].join('\n'), options);
 };
 
 const deleteLink = async (links: KVNamespace, aliasHash: string): Promise<void> => {
-  await Promise.all([links.delete(aliasHash), links.delete(clicksKey(aliasHash))]);
+  await Promise.all([
+    links.delete(aliasHash),
+    links.delete(clicksKey(aliasHash)),
+    links.delete(hallKey(aliasHash)),
+  ]);
 };
 
 const getClicks = async (links: KVNamespace, aliasHash: string): Promise<number> => {
@@ -73,5 +92,34 @@ const addClick = async (links: KVNamespace, aliasHash: string, meta: LinkMeta): 
   return clicks;
 };
 
-export { addClick, clicksKey, deleteLink, getClicks, getLink, LINK_CACHE_TTL, putLink };
-export type { LinkMeta, LinkRecord };
+/**
+ * Keeps the hall of fame entry in its key's metadata, so the hall page
+ * can be built from a single list call.
+ */
+const putHallEntry = (links: KVNamespace, aliasHash: string, entry: HallEntry, meta: LinkMeta): Promise<void> => {
+  const metadata = { a: entry.alias, c: entry.clicks };
+  const options = meta.exp ? { expiration: meta.exp, metadata } : { metadata };
+  return links.put(hallKey(aliasHash), '', options);
+};
+
+const listHall = async (links: KVNamespace, limit: number): Promise<HallEntry[]> => {
+  const { keys } = await links.list<{ a: string; c: number }>({ prefix: HALL_PREFIX });
+  return keys
+    .flatMap(({ metadata }) => (metadata ? [{ alias: metadata.a, clicks: metadata.c }] : []))
+    .sort((a, b) => b.clicks - a.clicks)
+    .slice(0, limit);
+};
+
+export {
+  addClick,
+  clicksKey,
+  deleteLink,
+  getClicks,
+  getLink,
+  hallKey,
+  LINK_CACHE_TTL,
+  listHall,
+  putHallEntry,
+  putLink,
+};
+export type { HallEntry, LinkMeta, LinkRecord };

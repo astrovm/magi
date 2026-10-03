@@ -24,11 +24,12 @@ const renderPage = (body: string, options: PageOptions = {}): Response => {
   <meta name="robots" content="noindex" />
   <title>${title}</title>
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" />
+  <link rel="preload" href="/fonts/fredoka-latin.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="/style.css" />
   <script src="/app.js" defer></script>
 </head>
 <body class="page">
+  <div class="season" aria-hidden="true"></div>
   <main class="stage">
     <a href="/" class="logo-link"><img src="/logo3d.webp" alt="Magi" class="logo" /></a>
     <section class="card">${body}</section>
