@@ -1,6 +1,6 @@
 import type { Env } from './cloudflareEnv';
-import { addClick, deleteLink } from './kvHelpers';
-import type { LinkMeta, LinkRecord } from './kvHelpers';
+import { addClick, deleteLink, putHallEntry } from './kvHelpers';
+import type { LinkRecord } from './kvHelpers';
 import { sendTelegramMessage, visitAlertText } from './telegram';
 
 const RICKROLL_URL = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
@@ -10,18 +10,26 @@ const RICKROLL_URL = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
  */
 const CURSE_CHANCE = 0.1;
 
-const pickDestination = (record: LinkRecord, random: () => number = Math.random): string =>
-  record.meta.cursed && random() < CURSE_CHANCE ? RICKROLL_URL : record.url;
+const pickDestination = (record: LinkRecord, random: () => number = Math.random): string => {
+  if (record.meta.cursed && random() < CURSE_CHANCE) {
+    return RICKROLL_URL;
+  }
+  const destinations = [record.url, ...(record.more ?? [])];
+  return destinations[Math.floor(random() * destinations.length)];
+};
 
 /**
  * Links with these spells must hit the worker on every visit,
  * so browsers can't cache their redirects.
  */
-const needsEveryVisit = (meta: LinkMeta): boolean =>
-  Boolean(meta.count || meta.max || meta.cursed || meta.tg || meta.pw);
+const needsEveryVisit = (record: LinkRecord): boolean => {
+  const { meta } = record;
+  return Boolean(meta.count || meta.max || meta.cursed || meta.tg || meta.pw || meta.wait || record.more);
+};
 
 type Visit = {
   env: Env;
+  alias: string;
   aliasHash: string;
   record: LinkRecord;
   shortLink: string;
@@ -29,7 +37,7 @@ type Visit = {
   request: Request;
 };
 
-const countVisit = async ({ env, aliasHash, record }: Visit): Promise<void> => {
+const countVisit = async ({ env, alias, aliasHash, record }: Visit): Promise<void> => {
   const { meta } = record;
   if (!meta.count && !meta.max) {
     return;
@@ -37,6 +45,10 @@ const countVisit = async ({ env, aliasHash, record }: Visit): Promise<void> => {
   const clicks = await addClick(env.links, aliasHash, meta);
   if (meta.max && clicks >= meta.max) {
     await deleteLink(env.links, aliasHash);
+    return;
+  }
+  if (meta.hall) {
+    await putHallEntry(env.links, aliasHash, { alias, clicks }, meta);
   }
 };
 

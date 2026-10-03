@@ -1,3 +1,11 @@
+@font-face {
+  font-family: "Fredoka";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/fonts/fredoka-latin.woff2") format("woff2");
+}
+
 :root {
   --ink: #fff8ff;
   --ink-soft: #e6d8f5;
@@ -166,7 +174,8 @@ code {
 }
 
 input,
-select {
+select,
+textarea {
   width: 100%;
   font: inherit;
   color: var(--ink);
@@ -183,7 +192,8 @@ input::placeholder {
 }
 
 input:focus,
-select:focus {
+select:focus,
+textarea:focus {
   border-color: var(--pink);
   box-shadow: 0 0 0 4px rgba(255, 124, 192, 0.25);
 }
@@ -271,6 +281,48 @@ details[open] > summary::after {
   height: 22px;
   accent-color: var(--pink);
   flex: none;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 84px;
+}
+
+.spell-grid .wide {
+  grid-column: 1 / -1;
+}
+
+.alias-status {
+  display: flex;
+  align-items: center;
+  padding-right: 14px;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.alias-status[data-status="free"] {
+  color: var(--good);
+}
+
+.alias-status[data-status="taken"],
+.alias-status[data-status="invalid"] {
+  color: var(--bad);
+}
+
+.turnstile:empty {
+  display: none;
+}
+
+/* keyboard focus */
+
+:is(a, button, summary, .copy-btn):focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+
+.btn:focus-visible {
+  border-radius: 999px;
 }
 
 /* buttons */
@@ -444,6 +496,131 @@ details[open] > summary::after {
   word-break: break-all;
 }
 
+/* qr */
+
+.qr {
+  margin-top: 12px;
+}
+
+.qr summary {
+  color: var(--ink-soft);
+}
+
+.qr-code {
+  width: min(220px, 100%);
+  margin: 8px auto 0;
+  padding: 8px;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.qr-code svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* my links */
+
+.my-links .count {
+  color: var(--ink-soft);
+  font-weight: 400;
+}
+
+.link-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.link-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 8px 8px 14px;
+  border-radius: 14px;
+  background: var(--field);
+}
+
+.link-list .short-link {
+  flex: 1;
+  min-width: 0;
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.chip {
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.1);
+  border: 0;
+  border-radius: 999px;
+  padding: 5px 12px;
+  cursor: pointer;
+}
+
+.chip:hover {
+  color: var(--gold);
+  background: rgba(255, 255, 255, 0.18);
+}
+
+/* countdown */
+
+.countdown-number {
+  margin: 4px 0 12px;
+  font-size: 4rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--gold);
+  text-shadow: 0 0 24px rgba(255, 216, 77, 0.6);
+}
+
+.card-art--charging {
+  animation: pulse 0.8s ease-in-out infinite;
+}
+
+/* hall of fame */
+
+.hall {
+  list-style: none;
+  margin: 16px 0 20px;
+  padding: 0;
+  text-align: left;
+}
+
+.hall li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: var(--field);
+  margin-bottom: 8px;
+}
+
+.hall a {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.hall .rank {
+  width: 2em;
+  text-align: center;
+}
+
+.hall .clicks {
+  font-weight: 700;
+  color: var(--gold);
+}
+
 /* preview */
 
 .facts {
@@ -547,6 +724,81 @@ details[open] > summary::after {
   right: 50%;
   border: 10px solid transparent;
   border-top-color: #fff;
+}
+
+/* worm moods */
+
+.worm-btn.cheer img {
+  animation: cheer 0.7s cubic-bezier(0.3, 1.6, 0.5, 1) 2;
+}
+
+.worm-btn.sad img {
+  animation: none;
+  transform: rotate(8deg) translateY(6px);
+  filter: drop-shadow(0 12px 18px rgba(0, 0, 0, 0.5)) grayscale(0.6) brightness(0.85);
+  transition: transform 0.4s, filter 0.4s;
+}
+
+.worm-btn.sleepy img {
+  animation: snooze 4s ease-in-out infinite;
+}
+
+.worm-btn.sleepy::after {
+  content: "z z z";
+  position: absolute;
+  top: 18%;
+  right: 6%;
+  font-weight: 700;
+  color: var(--ink-soft);
+  letter-spacing: 4px;
+  animation: zzz 2.5s ease-in-out infinite;
+}
+
+/* seasons */
+
+.season {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.season span {
+  position: absolute;
+  top: -40px;
+  font-size: 1.6rem;
+  opacity: 0.8;
+  animation: fall linear infinite;
+}
+
+.halloween .fireflies i {
+  background: #ffb347;
+  box-shadow: 0 0 10px 3px rgba(255, 140, 40, 0.7);
+}
+
+.halloween .familiar::before {
+  content: "🎃";
+  position: absolute;
+  bottom: 2%;
+  left: 4%;
+  font-size: 2.4rem;
+  filter: drop-shadow(0 0 12px rgba(255, 140, 40, 0.8));
+  z-index: 1;
+}
+
+.winter .fireflies i {
+  background: #fff;
+  box-shadow: 0 0 10px 3px rgba(200, 230, 255, 0.8);
+}
+
+.winter .familiar::before {
+  content: "🎄";
+  position: absolute;
+  bottom: 2%;
+  left: 2%;
+  font-size: 2.6rem;
+  z-index: 1;
 }
 
 /* footer */
@@ -653,6 +905,21 @@ details[open] > summary::after {
   to { filter: hue-rotate(360deg); }
 }
 
+@keyframes cheer {
+  40% { transform: translateY(-28px) rotate(-6deg) scale(1.05); }
+  70% { transform: translateY(0) rotate(4deg) scaleY(0.94); }
+}
+
+@keyframes snooze {
+  50% { transform: rotate(5deg) translateY(4px) scaleY(0.97); }
+}
+
+@keyframes zzz {
+  0% { opacity: 0; transform: translate(0, 6px); }
+  50% { opacity: 1; }
+  100% { opacity: 0; transform: translate(10px, -14px); }
+}
+
 @keyframes fall {
   to { transform: translateY(110vh) rotate(720deg); }
 }
@@ -662,6 +929,14 @@ details[open] > summary::after {
 @media (max-width: 720px) {
   body {
     background-attachment: scroll;
+    background:
+      linear-gradient(180deg, rgba(12, 6, 28, 0.15), rgba(12, 6, 28, 0.7)),
+      url("/forest.webp") 30% top / auto 100vh no-repeat,
+      #120a24;
+  }
+
+  .stage {
+    padding-top: 16px;
   }
 
   .altar {
@@ -672,28 +947,39 @@ details[open] > summary::after {
     width: 190px;
   }
 
+  /* The worm moves up beside the logo so the form starts above the fold. */
   .familiar {
-    order: -1;
-    margin: -8px 0 -4px;
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    margin: 0;
+    z-index: 2;
   }
 
   .worm-btn img {
-    width: 90px;
+    width: 64px;
   }
 
   .bubble {
-    right: auto;
-    left: 50%;
-    bottom: 30%;
-    width: 190px;
-    margin-left: 60px;
+    top: 100%;
+    bottom: auto;
+    right: 0;
+    width: 200px;
+    margin: 8px 0 0;
   }
 
   .bubble::after {
-    top: 50%;
-    right: 100%;
+    top: auto;
+    bottom: 100%;
+    right: 26px;
     border-top-color: transparent;
-    border-right-color: #fff;
+    border-bottom-color: #fff;
+  }
+
+  .halloween .familiar::before,
+  .winter .familiar::before {
+    font-size: 1.4rem;
+    left: -14px;
   }
 
   .card {

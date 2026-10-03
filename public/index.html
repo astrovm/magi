@@ -7,20 +7,26 @@
   <title>Magi</title>
   <meta name="description" content="A wizard worm that powers an orb. It shrinks links. Mostly." />
   <meta name="theme-color" content="#1b0f33" />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://s.4st.li/" />
   <meta property="og:title" content="Magi" />
   <meta property="og:description" content="A wizard worm that powers an orb. It shrinks links. Mostly." />
-  <meta property="og:image" content="/magi.webp" />
+  <meta property="og:image" content="https://s.4st.li/og.jpg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="The Magi wizard worm next to its orb in a purple forest" />
+  <meta name="twitter:card" content="summary_large_image" />
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" />
+  <link rel="preload" href="/fonts/fredoka-latin.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="/style.css" />
   <script src="/app.js" defer></script>
 </head>
 
 <body>
+  <div class="season" aria-hidden="true"></div>
+  <div class="season" aria-hidden="true"></div>
   <div class="fireflies" aria-hidden="true">
     <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
   </div>
@@ -43,7 +49,8 @@
             <div class="alias-field">
               <span class="prefix" data-host>s.4st.li/</span>
               <input type="text" name="alias" id="alias" placeholder="empty = the worm picks" autocomplete="off"
-                autocapitalize="off" spellcheck="false" />
+                autocapitalize="off" spellcheck="false" aria-describedby="alias-status" />
+              <span class="alias-status" id="alias-status" aria-live="polite"></span>
             </div>
 
             <details class="spells">
@@ -66,9 +73,15 @@
                 </label>
                 <label class="check"><input type="checkbox" name="count" /> 📊 count visits</label>
                 <label class="check"><input type="checkbox" name="cursed" /> ☠️ curse it (10% rickroll)</label>
+                <label class="check"><input type="checkbox" name="wait" /> ⏳ 5 second countdown</label>
+                <label class="check"><input type="checkbox" name="hall" /> 🏆 join the hall of fame</label>
+                <label class="wide">🥠 fortune cookie: also go to one of these
+                  <textarea name="fortune" rows="3" placeholder="one link per line, up to 9"></textarea>
+                </label>
               </div>
             </details>
 
+            <div class="turnstile" id="turnstile"></div>
             <button type="submit" class="btn btn--big">Summon link</button>
           </form>
           <div id="orb-res" class="orb-res" aria-live="polite"></div>
@@ -91,6 +104,12 @@
           </form>
           <div id="manage-res" class="orb-res" aria-live="polite"></div>
         </details>
+
+        <details class="card card--small my-links" id="my-links" hidden>
+          <summary>📜 my links <span class="count" data-count></span></summary>
+          <p class="hint">saved only in this browser, manage keys included.</p>
+          <ul class="link-list" data-list></ul>
+        </details>
       </div>
 
       <figure class="familiar">
@@ -106,6 +125,7 @@
 
   <footer class="footer">
     <p>add <code>+</code> to any link to peek before you click</p>
+    <p><a href="/hall">🏆 hall of fame</a></p>
     <p>made with 🪱 by <a href="https://github.com/astrovm/magi">astrovm</a></p>
   </footer>
 </body>

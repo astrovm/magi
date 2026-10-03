@@ -1,4 +1,7 @@
-type PutOptions = { expiration?: number; metadata?: unknown };
+import { mock, spyOn } from 'bun:test';
+import type { LinkMeta } from '../modules/kvHelpers';
+
+type PutOptions = { expiration?: number; expirationTtl?: number; metadata?: unknown };
 
 export class MemoryKV {
   readonly store: Map<string, string>;
@@ -34,6 +37,13 @@ export class MemoryKV {
     }
   }
 
+  async list(options: { prefix?: string } = {}): Promise<{ keys: Array<{ name: string; metadata: unknown }> }> {
+    const keys = [...this.store.keys()]
+      .filter((name) => name.startsWith(options.prefix ?? ''))
+      .map((name) => ({ name, metadata: this.metadata.get(name) }));
+    return { keys };
+  }
+
   async delete(key: string): Promise<void> {
     this.store.delete(key);
     this.metadata.delete(key);
@@ -43,3 +53,56 @@ export class MemoryKV {
 export const md5 = (text: string): string => new Bun.CryptoHasher('md5').update(text).digest('hex');
 
 export const sha256 = (text: string): string => new Bun.CryptoHasher('sha256').update(text).digest('hex');
+
+export const assetResponse = new Response('asset');
+export const HOST = 'https://s.4st.li';
+
+export type TestEnv = {
+  links: MemoryKV;
+  ASSETS: { fetch: ReturnType<typeof mock> };
+  TELEGRAM_BOT_TOKEN?: string;
+  TELEGRAM_BOT_USERNAME?: string;
+  TELEGRAM_WEBHOOK_SECRET?: string;
+  TURNSTILE_SITE_KEY?: string;
+  TURNSTILE_SECRET_KEY?: string;
+  SAFE_BROWSING_API_KEY?: string;
+};
+
+export const makeEnv = (extra: Partial<TestEnv> = {}): TestEnv => {
+  const links = new MemoryKV();
+  const fetch = mock(async () => assetResponse);
+  return { links, ASSETS: { fetch }, ...extra };
+};
+
+export const storeLink = (env: TestEnv, alias: string, url: string, meta?: LinkMeta): void => {
+  env.links.store.set(md5(alias), url);
+  if (meta) {
+    env.links.metadata.set(md5(alias), meta);
+  }
+};
+
+export const formRequest = (
+  path: string,
+  fields: Record<string, string | Blob>,
+  headers: Record<string, string> = { 'X-Orb': 'fragment' },
+): Request => {
+  const body = new FormData();
+  Object.entries(fields).forEach(([key, value]) => body.append(key, value));
+  return new Request(`${HOST}${path}`, { method: 'POST', body, headers });
+};
+
+export const visitContext = (env: TestEnv, alias: string | string[] | undefined, request?: Request) => {
+  const pending: Promise<unknown>[] = [];
+  return {
+    pending,
+    context: {
+      env,
+      params: { alias },
+      request: request ?? new Request(`${HOST}/${typeof alias === 'string' ? alias : ''}`),
+      waitUntil: (promise: Promise<unknown>) => pending.push(promise),
+    },
+  };
+};
+
+export const fetchSpy = () => spyOn(globalThis, 'fetch').mockImplementation(async () => new Response('{}'));
+

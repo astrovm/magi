@@ -1,3 +1,4 @@
+import { renderSVG } from 'uqr';
 import { escapeHtml, renderPage } from './html';
 
 const HTML_HEADERS = { 'Content-Type': 'text/html; charset=utf-8' } as const;
@@ -11,6 +12,9 @@ const ORB_OWN_TAIL_MESSAGE = 'the orb refuses to eat its own tail.';
 const ORB_WRONG_KEY_MESSAGE = "the orb doesn't recognize that manage key.";
 const ORB_BAD_SPELL_MESSAGE = 'the orb rejected your weird spell settings.';
 const ORB_NO_ALIAS_LEFT_MESSAGE = 'the worm ran out of ideas. try a custom alias.';
+const ORB_DANGER_MESSAGE = 'the orb smells something fishy. that link looks like phishing or malware.';
+const ORB_TOO_MANY_MESSAGE = 'the worm is exhausted. try again later.';
+const ORB_NOT_HUMAN_MESSAGE = "the orb couldn't tell if you're human. try again.";
 const WORM_LINK_CREATED_MESSAGE = 'the worm summoned your link';
 const WORM_LINK_TRANSMUTED_MESSAGE = 'the worm transmuted your link.';
 const WORM_LINK_BANISHED_MESSAGE = 'the worm banished your link to the shadow realm.';
@@ -25,6 +29,9 @@ type ResponseKey =
   | 'badSpell'
   | 'noAliasLeft'
   | 'linkNotFound'
+  | 'dangerUrl'
+  | 'tooMany'
+  | 'notHuman'
   | 'linkTransmuted'
   | 'linkBanished';
 
@@ -40,6 +47,9 @@ const RESPONSES: Record<ResponseKey, { message: string; status: number; tone: To
   badSpell: { message: ORB_BAD_SPELL_MESSAGE, status: 400, tone: 'error' },
   noAliasLeft: { message: ORB_NO_ALIAS_LEFT_MESSAGE, status: 503, tone: 'error' },
   linkNotFound: { message: ORB_LINK_NOT_FOUND_MESSAGE, status: 404, tone: 'error' },
+  dangerUrl: { message: ORB_DANGER_MESSAGE, status: 400, tone: 'error' },
+  tooMany: { message: ORB_TOO_MANY_MESSAGE, status: 429, tone: 'error' },
+  notHuman: { message: ORB_NOT_HUMAN_MESSAGE, status: 403, tone: 'error' },
   linkTransmuted: { message: WORM_LINK_TRANSMUTED_MESSAGE, status: 200, tone: 'success' },
   linkBanished: { message: WORM_LINK_BANISHED_MESSAGE, status: 200, tone: 'success' },
 };
@@ -83,10 +93,15 @@ const linkCreatedHtml = ({ shortUrl, manageKey, alias, telegramBot }: CreatedLin
     ? `<p class="hint">📡 visit alerts: send <code>${alertCommand}</code> to <a href="https://t.me/${escapeHtml(telegramBot)}">@${escapeHtml(telegramBot)}</a></p>`
     : '';
 
-  return `<div class="summoned">
+  // The page script reads these to save the link under "my links".
+  return `<div class="summoned" data-alias="${escapeHtml(alias)}" data-short="${safeUrl}" data-key="${escapeHtml(manageKey)}">
   ${orbMessage(WORM_LINK_CREATED_MESSAGE, 'success')}
   ${copyRow(`<a class="short-link" href="${safeUrl}">${shortLabel}</a>`, shortUrl)}
   <p class="hint">🔍 peek first: <a href="${safeUrl}+">${shortLabel}+</a></p>
+  <details class="qr">
+    <summary>📱 QR code</summary>
+    <div class="qr-code">${renderSVG(shortUrl, { border: 2 })}</div>
+  </details>
   <div class="scroll">
     <p class="hint">🔑 manage key. shown once, the worm has the memory of a worm.</p>
     ${copyRow(`<code class="secret">${escapeHtml(manageKey)}</code>`, manageKey)}
@@ -105,6 +120,9 @@ export {
   orbMessage,
   reply,
   ORB_BAD_SPELL_MESSAGE,
+  ORB_DANGER_MESSAGE,
+  ORB_NOT_HUMAN_MESSAGE,
+  ORB_TOO_MANY_MESSAGE,
   ORB_LINK_NOT_FOUND_MESSAGE,
   ORB_NO_ALIAS_LEFT_MESSAGE,
   ORB_OWN_TAIL_MESSAGE,

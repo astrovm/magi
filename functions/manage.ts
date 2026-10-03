@@ -1,6 +1,7 @@
 import type { PagesFunction } from '@cloudflare/workers-types';
 import Alias from '../modules/aliasClass';
 import type { Env } from '../modules/cloudflareEnv';
+import { isDangerousUrl } from '../modules/guards';
 import { deleteLink, getLink, putLink } from '../modules/kvHelpers';
 import { parseTarget } from '../modules/linkInput';
 import { getResponse } from '../modules/responses';
@@ -39,6 +40,10 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, request }) => {
     return getResponse(request, url);
   }
 
-  await putLink(env.links, aliasHash, { url: url.get(), meta: record.meta });
+  if (await isDangerousUrl(env.SAFE_BROWSING_API_KEY, url.get())) {
+    return getResponse(request, 'dangerUrl');
+  }
+
+  await putLink(env.links, aliasHash, { ...record, url: url.get() });
   return getResponse(request, 'linkTransmuted');
 };

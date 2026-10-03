@@ -10,6 +10,8 @@ import Url from './urlClass';
 const EXPIRY_OPTIONS = ['3600', '86400', '604800', '2592000'];
 const MAX_SELF_DESTRUCT = 1000000;
 const MAX_PASSWORD_LENGTH = 256;
+/** Extra fortune cookie destinations on top of the main link. */
+const MAX_FORTUNES = 9;
 
 type Spells = Omit<LinkMeta, 'created' | 'key'> & { password?: string };
 
@@ -46,6 +48,14 @@ const parseSpells = (formFields: FormData, now: number): Spells | null => {
   if (formFields.get('count') === 'on') {
     spells.count = true;
   }
+  if (formFields.get('wait') === 'on') {
+    spells.wait = true;
+  }
+  if (formFields.get('hall') === 'on') {
+    // The hall ranks links by visits, so it needs the counter.
+    spells.hall = true;
+    spells.count = true;
+  }
 
   return spells;
 };
@@ -67,5 +77,32 @@ const parseTarget = (urlField: string, ownHost: string): Url | ResponseKey => {
   return url;
 };
 
-export { EXPIRY_OPTIONS, MAX_PASSWORD_LENGTH, MAX_SELF_DESTRUCT, parseSpells, parseTarget };
+/**
+ * Reads the fortune cookie list: extra links, one per line.
+ */
+const parseFortunes = (text: string, ownHost: string): string[] | ResponseKey => {
+  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter((line) => line !== '');
+  if (lines.length > MAX_FORTUNES) {
+    return 'badSpell';
+  }
+  const urls: string[] = [];
+  for (const line of lines) {
+    const url = parseTarget(line, ownHost);
+    if (typeof url === 'string') {
+      return url;
+    }
+    urls.push(url.get());
+  }
+  return urls;
+};
+
+export {
+  EXPIRY_OPTIONS,
+  MAX_FORTUNES,
+  MAX_PASSWORD_LENGTH,
+  MAX_SELF_DESTRUCT,
+  parseFortunes,
+  parseSpells,
+  parseTarget,
+};
 export type { Spells };

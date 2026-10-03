@@ -17,7 +17,19 @@ It shrinks links. Mostly.
 - **Curse**: 10% of visits get rickrolled.
 - **Manage key**: shown once when you create a link. Use it to **Transmute** (change the destination) or **Banish** (delete) the link.
 - **Telegram alerts**: get a message with the city, country and browser of each visit. No IPs.
-- Poke the worm. Try the Konami code.
+- **Fortune cookie**: each visit goes to a random link from your list.
+- **Countdown**: visitors wait 5 seconds while the worm charges the orb.
+- **Hall of fame**: opt in and compete for the most visits at `/hall`.
+- **QR code** for every new link.
+- **My links**: your links and manage keys, saved only in your browser.
+- Poke the worm. Leave it alone and it falls asleep. Try the Konami code. Visit in October or December.
+
+## 🛡️ Abuse protection
+
+- Each visitor can create 30 links per hour.
+- 5 wrong passwords lock that visitor out of the link for 15 minutes.
+- **Turnstile** (optional): set `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` to ask for a human check before creating links.
+- **Safe Browsing** (optional): set `SAFE_BROWSING_API_KEY` to refuse links Google flags as phishing or malware.
 
 Visit counts and self-destructs are approximate: Workers KV has no atomic counters and caches reads for up to 5 minutes.
 

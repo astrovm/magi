@@ -2,8 +2,16 @@ import type { PagesFunction } from '@cloudflare/workers-types';
 import Alias from '../modules/aliasClass';
 import type { Env } from '../modules/cloudflareEnv';
 import { MAX_ALIAS_LENGTH } from '../modules/commonFunctions';
+import {
+  countAttempt,
+  CREATE_LIMIT,
+  isDangerousUrl,
+  isLimited,
+  limitKey,
+  passesTurnstile,
+} from '../modules/guards';
 import { getLink, putLink } from '../modules/kvHelpers';
-import { parseSpells, parseTarget } from '../modules/linkInput';
+import { parseFortunes, parseSpells, parseTarget } from '../modules/linkInput';
 import { getResponse, linkCreated } from '../modules/responses';
 import type { ResponseKey } from '../modules/responses';
 import { readStringField } from '../modules/requestParsers';
@@ -38,13 +46,50 @@ const claimRandomAlias = async (env: Env): Promise<ClaimedAlias> => {
   return 'noAliasLeft';
 };
 
+const json = (body: unknown): Response =>
+  new Response(JSON.stringify(body), {
+    headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' },
+  });
+
+type AliasStatus = 'free' | 'taken' | 'invalid';
+
+const ALIAS_STATUS: Partial<Record<ResponseKey, AliasStatus>> = { aliasLocked: 'taken' };
+
+/**
+ * `GET /orb?alias=x` tells the form if an alias is free while you type.
+ * `GET /orb` hands the page its public settings.
+ */
+export const onRequestGet: PagesFunction<Env> = async ({ env, request }) => {
+  const aliasParam = new URL(request.url).searchParams.get('alias');
+  if (aliasParam === null) {
+    return json({ turnstileSiteKey: env.TURNSTILE_SITE_KEY ?? null });
+  }
+  if (aliasParam.trim() === '') {
+    return json({ status: 'invalid' });
+  }
+  const claimed = await claimCustomAlias(env, aliasParam);
+  if (typeof claimed === 'string') {
+    return json({ status: ALIAS_STATUS[claimed] ?? 'invalid' });
+  }
+  return json({ status: 'free', alias: claimed.alias });
+};
+
 export const onRequestPost: PagesFunction<Env> = async ({ env, request }) => {
   const formFields = await request.formData();
   const urlField = readStringField(formFields.get('url'));
   const aliasField = formFields.get('alias') ?? '';
+  const fortuneField = formFields.get('fortune') ?? '';
 
-  if (urlField === null || typeof aliasField !== 'string') {
+  if (urlField === null || typeof aliasField !== 'string' || typeof fortuneField !== 'string') {
     return getResponse(request, 'invalidRequest');
+  }
+
+  const createKey = await limitKey('create', request);
+  if (await isLimited(env.links, createKey, CREATE_LIMIT)) {
+    return getResponse(request, 'tooMany');
+  }
+  if (!(await passesTurnstile(env.TURNSTILE_SECRET_KEY, formFields.get('cf-turnstile-response'), request))) {
+    return getResponse(request, 'notHuman');
   }
 
   const now = Date.now();
@@ -58,6 +103,16 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, request }) => {
   if (typeof url === 'string') {
     return getResponse(request, url);
   }
+  const fortunes = parseFortunes(fortuneField, requestUrl.host);
+  if (typeof fortunes === 'string') {
+    return getResponse(request, fortunes);
+  }
+  const dangers = await Promise.all(
+    [url.get(), ...fortunes].map((target) => isDangerousUrl(env.SAFE_BROWSING_API_KEY, target)),
+  );
+  if (dangers.includes(true)) {
+    return getResponse(request, 'dangerUrl');
+  }
 
   const claimed = aliasField.trim() === ''
     ? await claimRandomAlias(env)
@@ -68,8 +123,10 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, request }) => {
 
   const { password, ...meta } = spells;
   const manageKey = randomToken();
+  await countAttempt(env.links, createKey, CREATE_LIMIT);
   await putLink(env.links, claimed.aliasHash, {
     url: url.get(),
+    ...(fortunes.length > 0 ? { more: fortunes } : {}),
     meta: {
       ...meta,
       created: now,

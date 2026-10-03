@@ -1,9 +1,10 @@
 import type { PagesFunction } from '@cloudflare/workers-types';
 import Alias from '../modules/aliasClass';
 import type { Env } from '../modules/cloudflareEnv';
-import { getClicks, getLink } from '../modules/kvHelpers';
+import { countAttempt, isLimited, limitKey, UNLOCK_LIMIT } from '../modules/guards';
+import { deleteLink, getClicks, getLink } from '../modules/kvHelpers';
 import type { LinkRecord } from '../modules/kvHelpers';
-import { notFoundPage, previewPage, unlockPage } from '../modules/pages';
+import { countdownPage, notFoundPage, previewPage, unlockPage } from '../modules/pages';
 import { getResponse } from '../modules/responses';
 import { readStringField } from '../modules/requestParsers';
 import { verifyPassword } from '../modules/secrets';
@@ -36,16 +37,29 @@ const lookUp = async (env: Env, aliasParam: string): Promise<Lookup | 'asset'> =
 
 type Context = Parameters<PagesFunction<Env, 'alias'>>[0];
 
-const visit = (context: Context, lookup: Lookup, record: LinkRecord): Response => {
+const visit = async (context: Context, lookup: Lookup, record: LinkRecord): Promise<Response> => {
   const { env, request } = context;
-  const target = pickDestination(record);
-  const shortLink = `${new URL(request.url).host}/${lookup.alias}`;
-  const tracked = needsEveryVisit(record.meta);
-  // HEAD is what link checkers send: answer like GET, but it isn't a visit.
-  if (tracked && request.method !== 'HEAD') {
-    context.waitUntil(recordVisit({ env, aliasHash: lookup.aliasHash, record, shortLink, target, request }));
+  const { alias, aliasHash } = lookup;
+  const { meta } = record;
+
+  // The link lookup is cached, so a self-destructed link can linger for a
+  // few minutes. The fresh counter catches it.
+  if (meta.max && (await getClicks(env.links, aliasHash)) >= meta.max) {
+    context.waitUntil(deleteLink(env.links, aliasHash));
+    return notFoundPage();
   }
-  return redirectTo(target, !tracked);
+
+  const target = pickDestination(record);
+  const tracked = needsEveryVisit(record);
+  // HEAD is what link checkers send: answer like GET, but it isn't a visit.
+  if (request.method === 'HEAD') {
+    return redirectTo(target, !tracked);
+  }
+  if (tracked) {
+    const shortLink = `${new URL(request.url).host}/${alias}`;
+    context.waitUntil(recordVisit({ env, alias, aliasHash, record, shortLink, target, request }));
+  }
+  return meta.wait ? countdownPage(target) : redirectTo(target, !tracked);
 };
 
 export const onRequestGet: PagesFunction<Env, 'alias'> = async (context) => {
@@ -98,8 +112,13 @@ export const onRequestPost: PagesFunction<Env, 'alias'> = async (context) => {
     return visit(context, lookup, record);
   }
 
+  const unlockKey = await limitKey(`unlock:${lookup.aliasHash}`, request);
+  if (await isLimited(env.links, unlockKey, UNLOCK_LIMIT)) {
+    return unlockPage(lookup.alias, 'locked');
+  }
   if (!(await verifyPassword(password, record.meta.pw))) {
-    return unlockPage(lookup.alias, true);
+    await countAttempt(env.links, unlockKey, UNLOCK_LIMIT);
+    return unlockPage(lookup.alias, 'wrong');
   }
 
   return visit(context, lookup, record);
