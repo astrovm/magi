@@ -105,3 +105,6 @@ dist
 
 # wrangler local files
 .mf/
+
+# wrangler dev state
+.wrangler/
