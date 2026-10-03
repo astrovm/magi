@@ -1,5 +1,5 @@
 import type { Env } from './cloudflareEnv';
-import { addClick, deleteLink, putHallEntry } from './kvHelpers';
+import { addClick, deleteLink } from './kvHelpers';
 import type { LinkRecord } from './kvHelpers';
 import { sendTelegramMessage, visitAlertText } from './telegram';
 
@@ -29,7 +29,6 @@ const needsEveryVisit = (record: LinkRecord): boolean => {
 
 type Visit = {
   env: Env;
-  alias: string;
   aliasHash: string;
   record: LinkRecord;
   shortLink: string;
@@ -37,7 +36,7 @@ type Visit = {
   request: Request;
 };
 
-const countVisit = async ({ env, alias, aliasHash, record }: Visit): Promise<void> => {
+const countVisit = async ({ env, aliasHash, record }: Visit): Promise<void> => {
   const { meta } = record;
   if (!meta.count && !meta.max) {
     return;
@@ -45,10 +44,6 @@ const countVisit = async ({ env, alias, aliasHash, record }: Visit): Promise<voi
   const clicks = await addClick(env.links, aliasHash, meta);
   if (meta.max && clicks >= meta.max) {
     await deleteLink(env.links, aliasHash);
-    return;
-  }
-  if (meta.hall) {
-    await putHallEntry(env.links, aliasHash, { alias, clicks }, meta);
   }
 };
 

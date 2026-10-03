@@ -25,7 +25,7 @@ describe('commonFunctions', () => {
   test('exposes the input limits', () => {
     expect(MAX_ALIAS_LENGTH).toBe(13312);
     expect(MAX_URL_LENGTH).toBe(2048);
-    expect(RESERVED_ALIASES).toEqual(['orb', 'manage', 'telegram', 'hall']);
+    expect(RESERVED_ALIASES).toEqual(['orb', 'manage', 'telegram']);
   });
 
   test('adds https to scheme-less input', () => {

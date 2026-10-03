@@ -37,13 +37,6 @@ export class MemoryKV {
     }
   }
 
-  async list(options: { prefix?: string } = {}): Promise<{ keys: Array<{ name: string; metadata: unknown }> }> {
-    const keys = [...this.store.keys()]
-      .filter((name) => name.startsWith(options.prefix ?? ''))
-      .map((name) => ({ name, metadata: this.metadata.get(name) }));
-    return { keys };
-  }
-
   async delete(key: string): Promise<void> {
     this.store.delete(key);
     this.metadata.delete(key);

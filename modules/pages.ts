@@ -1,5 +1,5 @@
 import { escapeHtml, renderPage } from './html';
-import type { HallEntry, LinkRecord } from './kvHelpers';
+import type { LinkRecord } from './kvHelpers';
 import { ORB_LINK_NOT_FOUND_MESSAGE, orbMessage } from './responses';
 
 const PRIVATE_HEADERS = { 'Cache-Control': 'no-store' } as const;
@@ -76,7 +76,6 @@ const previewPage = ({ alias, host, record, clicks }: PreviewDetails): Response 
     meta.cursed ? fact('curse', '☠️ might rickroll you') : '',
     meta.tg ? fact('snitch', '📡 the owner gets visit alerts') : '',
     meta.wait ? fact('countdown', `⏳ ${COUNTDOWN_SECONDS} seconds of suspense`) : '',
-    meta.hall ? fact('fame', '🏆 on the <a href="/hall">hall of fame</a>') : '',
   ].join('');
 
   return renderPage(
@@ -108,30 +107,9 @@ const countdownPage = (target: string): Response => {
   );
 };
 
-const hallPage = (entries: HallEntry[], host: string): Response => {
-  const rows = entries
-    .map(({ alias, clicks }, index) => {
-      const medal = ['🥇', '🥈', '🥉'][index] ?? `${index + 1}.`;
-      const safeAlias = escapeHtml(alias);
-      return `<li><span class="rank">${medal}</span><a href="/${safeAlias}+">${escapeHtml(host)}/${safeAlias}</a><span class="clicks">${clicks}</span></li>`;
-    })
-    .join('');
-  const body = rows
-    ? `<ol class="hall">${rows}</ol>`
-    : '<p class="hint">the hall is empty. tick 🏆 when you summon a link to get in.</p>';
-  return renderPage(
-    `<h1 class="card-title">🏆 hall of fame</h1>
-<p class="hint">the most visited links that asked to be famous.</p>
-${body}
-<a href="/" class="btn">summon a contender</a>`,
-    { title: 'hall of fame', headers: { 'Cache-Control': 'public, max-age=600' } },
-  );
-};
-
 export {
   COUNTDOWN_SECONDS,
   countdownPage,
-  hallPage,
   LOCKED_OUT_MESSAGE,
   notFoundPage,
   previewPage,
