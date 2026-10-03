@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, mock, spyOn, test } from 'bun:test';
-import { onRequestGet, onRequestPost as postAlias } from '../functions/[alias]';
+import { onRequestGet, onRequestHead, onRequestPost as postAlias } from '../functions/[alias]';
 import { onRequestPost as postManage } from '../functions/manage';
 import { onRequestPost as postOrbHandler } from '../functions/orb';
 import { onRequestPost as postTelegram } from '../functions/telegram';
@@ -11,6 +11,7 @@ import { MemoryKV, md5, sha256 } from './helpers';
 
 type Handler = (context: unknown) => Promise<Response>;
 const getAlias = onRequestGet as unknown as Handler;
+const headAlias = onRequestHead as unknown as Handler;
 const unlockAlias = postAlias as unknown as Handler;
 const postOrb = postOrbHandler as unknown as Handler;
 const manage = postManage as unknown as Handler;
@@ -214,6 +215,23 @@ describe('GET /:alias', () => {
       '🔮 someone opened s.4st.li/watched\n🌍 Rosario, AR\n🧭 Safari on iOS\n➡️ https://example.com',
     );
     expect(body.text).not.toContain('203.0.113.9');
+  });
+
+  test('answers HEAD like GET without counting a visit', async () => {
+    const env = makeEnv({ TELEGRAM_BOT_TOKEN: 'token' });
+    storeLink(env, 'plain', 'https://example.com/plain');
+    storeLink(env, 'tracked', 'https://example.com/tracked', { count: true, tg: 42 });
+    const fetch = fetchSpy();
+    for (const [alias, status] of [['plain', 301], ['tracked', 302]] as const) {
+      const request = new Request(`${HOST}/${alias}`, { method: 'HEAD' });
+      const { context, pending } = visitContext(env, alias, request);
+      const response = await headAlias(context);
+      expect(response.status).toBe(status);
+      expect(response.headers.get('Location')).toBe(`https://example.com/${alias}`);
+      expect(pending).toHaveLength(0);
+    }
+    expect(env.links.store.has(`clicks:${md5('tracked')}`)).toBe(false);
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   test('stays quiet when the bot is not configured', async () => {
