@@ -41,7 +41,8 @@ const visit = (context: Context, lookup: Lookup, record: LinkRecord): Response =
   const target = pickDestination(record);
   const shortLink = `${new URL(request.url).host}/${lookup.alias}`;
   const tracked = needsEveryVisit(record.meta);
-  if (tracked) {
+  // HEAD is what link checkers send: answer like GET, but it isn't a visit.
+  if (tracked && request.method !== 'HEAD') {
     context.waitUntil(recordVisit({ env, aliasHash: lookup.aliasHash, record, shortLink, target, request }));
   }
   return redirectTo(target, !tracked);
@@ -103,3 +104,6 @@ export const onRequestPost: PagesFunction<Env, 'alias'> = async (context) => {
 
   return visit(context, lookup, record);
 };
+
+// Without this, HEAD falls through to the static homepage.
+export const onRequestHead = onRequestGet;
