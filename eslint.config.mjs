@@ -4,7 +4,7 @@ import tsParser from '@typescript-eslint/parser';
 
 export default [
   {
-    ignores: ['node_modules/', 'coverage/', '.wrangler/', 'public/'],
+    ignores: ['node_modules/', 'coverage/', '.wrangler/', 'public/', 'vendor/'],
   },
   js.configs.recommended,
   ...tsPlugin.configs['flat/recommended'],

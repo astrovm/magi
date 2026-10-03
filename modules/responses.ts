@@ -1,4 +1,4 @@
-import { renderSVG } from 'uqr';
+import { renderSVG } from '../vendor/uqr/index.mjs';
 import { escapeHtml, renderPage } from './html';
 
 const HTML_HEADERS = { 'Content-Type': 'text/html; charset=utf-8' } as const;

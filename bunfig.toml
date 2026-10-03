@@ -1,3 +1,5 @@
 [test]
 preload = ["./tests/setup.ts"]
 coverageThreshold = { lines = 1.0, functions = 1.0 }
+# Third-party code copied in so Pages Functions can bundle it.
+coveragePathIgnorePatterns = ["vendor/**"]
