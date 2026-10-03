@@ -1,4 +1,4 @@
-import { hasSpecialChars, hashText } from './commonFunctions';
+import { hasSpecialChars, hashText, RESERVED_ALIASES } from './commonFunctions';
 import StringValue from './stringValue';
 
 export default class Alias extends StringValue {
@@ -16,6 +16,21 @@ export default class Alias extends StringValue {
 
   hasSpecialChars(): boolean {
     return hasSpecialChars(this.value);
+  }
+
+  isReserved(): boolean {
+    return RESERVED_ALIASES.includes(this.value.toLowerCase());
+  }
+
+  /**
+   * Removes a trailing marker like the `+` in `/alias+` and reports if it was there.
+   */
+  stripSuffix(suffix: string): boolean {
+    if (!this.value.endsWith(suffix)) {
+      return false;
+    }
+    this.value = this.value.slice(0, -suffix.length);
+    return true;
   }
 
   decode(): this {

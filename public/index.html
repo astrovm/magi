@@ -3,29 +3,111 @@
 
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Magi</title>
-  <meta name="description" content="A wizard worm that powers an orb." />
+  <meta name="description" content="A wizard worm that powers an orb. It shrinks links. Mostly." />
+  <meta name="theme-color" content="#1b0f33" />
+  <meta property="og:title" content="Magi" />
+  <meta property="og:description" content="A wizard worm that powers an orb. It shrinks links. Mostly." />
+  <meta property="og:image" content="/magi.webp" />
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" />
   <link rel="stylesheet" href="/style.css" />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/htmx/1.9.10/htmx.min.js"
-    integrity="sha512-9qpauSP4+dDIldsrdNEZ2Z7JoyLZGfJsAP2wfXnc3drOh+5NXOBxjlq3sGXKdulmN9W+iwLxRt42zKMa8AHEeg=="
-    crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="/app.js" defer></script>
 </head>
 
 <body>
-  <br />
-  <a href="/"><img src="/logo3d.webp" /></a>
-  <form hx-post="/orb" hx-target="#orb-res" hx-swap="innerHTML">
-    <input type="text" name="alias" id="alias" placeholder="alias" required />
-    <input type="url" name="url" id="url" placeholder="url" required />
-    <input type="submit" value="submit" />
-  </form>
-  <div id="orb-res"></div>
-  <img src="/wizard.webp" id="wizard" />
+  <div class="fireflies" aria-hidden="true">
+    <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+  </div>
+
+  <main class="stage">
+    <header class="hero">
+      <a href="/" class="logo-link"><img src="/logo3d.webp" alt="Magi" class="logo" /></a>
+      <p class="tagline">a wizard worm that powers an orb.<br />it shrinks links. mostly.</p>
+    </header>
+
+    <div class="altar">
+      <div class="column">
+        <section class="card">
+          <form action="/orb" method="post" class="spell-form" data-orb="#orb-res" data-reset>
+            <label for="url">long sad link</label>
+            <input type="text" inputmode="url" name="url" id="url" placeholder="paste it here" autocomplete="off"
+              required />
+
+            <label for="alias">alias</label>
+            <div class="alias-field">
+              <span class="prefix" data-host>s.4st.li/</span>
+              <input type="text" name="alias" id="alias" placeholder="empty = the worm picks" autocomplete="off"
+                autocapitalize="off" spellcheck="false" />
+            </div>
+
+            <details class="spells">
+              <summary>✨ extra spells</summary>
+              <div class="spell-grid">
+                <label>🔒 password
+                  <input type="password" name="password" placeholder="none" autocomplete="new-password" maxlength="256" />
+                </label>
+                <label>💣 self-destruct after
+                  <input type="number" name="burn" min="1" max="1000000" placeholder="∞ visits" />
+                </label>
+                <label>⏳ expires
+                  <select name="expires">
+                    <option value="">never</option>
+                    <option value="3600">in 1 hour</option>
+                    <option value="86400">in 1 day</option>
+                    <option value="604800">in 1 week</option>
+                    <option value="2592000">in 30 days</option>
+                  </select>
+                </label>
+                <label class="check"><input type="checkbox" name="count" /> 📊 count visits</label>
+                <label class="check"><input type="checkbox" name="cursed" /> ☠️ curse it (10% rickroll)</label>
+              </div>
+            </details>
+
+            <button type="submit" class="btn btn--big">Summon link</button>
+          </form>
+          <div id="orb-res" class="orb-res" aria-live="polite"></div>
+        </section>
+
+        <details class="card card--small manage">
+          <summary>🪄 manage a link</summary>
+          <form action="/manage" method="post" class="spell-form" data-orb="#manage-res">
+            <label for="manage-alias">alias</label>
+            <input type="text" name="alias" id="manage-alias" autocomplete="off" autocapitalize="off" spellcheck="false"
+              required />
+            <label for="manage-key">manage key</label>
+            <input type="password" name="key" id="manage-key" autocomplete="off" required />
+            <label for="manage-url">new link</label>
+            <input type="text" inputmode="url" name="url" id="manage-url" placeholder="only to transmute" autocomplete="off" />
+            <div class="btn-row">
+              <button type="submit" name="action" value="transmute" class="btn">Transmute</button>
+              <button type="submit" name="action" value="banish" class="btn btn--danger" data-confirm="banish this link forever?">Banish</button>
+            </div>
+          </form>
+          <div id="manage-res" class="orb-res" aria-live="polite"></div>
+        </details>
+      </div>
+
+      <figure class="familiar">
+        <p class="bubble" id="bubble" hidden></p>
+        <button type="button" class="worm-btn" id="worm" aria-label="Poke the worm">
+          <img src="/wizard.webp" alt="The wizard worm and its orb" />
+          <span class="orb-glow" aria-hidden="true"></span>
+        </button>
+      </figure>
+    </div>
+
+  </main>
+
+  <footer class="footer">
+    <p>add <code>+</code> to any link to peek before you click</p>
+    <p>made with 🪱 by <a href="https://github.com/astrovm/magi">astrovm</a></p>
+  </footer>
 </body>
 
 </html>

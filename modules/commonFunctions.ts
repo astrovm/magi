@@ -10,6 +10,11 @@ export const MAX_ALIAS_LENGTH = 13312;
  */
 export const MAX_URL_LENGTH = 2048;
 
+/**
+ * Paths owned by functions, so they can't be used as aliases.
+ */
+export const RESERVED_ALIASES = ['orb', 'manage', 'telegram'];
+
 export const isAValidUrl = (input: string): boolean => {
   try {
     const url = new URL(input);
@@ -20,6 +25,14 @@ export const isAValidUrl = (input: string): boolean => {
     }
     throw error;
   }
+};
+
+/**
+ * Lets people paste `example.com` without typing the scheme.
+ */
+export const withScheme = (input: string): string => {
+  const trimmed = input.trim();
+  return trimmed.includes('://') ? trimmed : `https://${trimmed}`;
 };
 
 export const hasSpecialChars = (input: string): boolean => input !== encodeURIComponent(input);
