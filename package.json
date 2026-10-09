@@ -9,7 +9,7 @@
     "@typescript-eslint/parser": "^8.71.0",
     "eslint": "^10.11.0",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
-    "wrangler": "^4.144.0",
+    "wrangler": "^4.147.0",
     "@typescript/native": "npm:typescript@~7.0.2"
   },
   "description": "A wizard worm that powers an orb.",
