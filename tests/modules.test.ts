@@ -69,6 +69,12 @@ describe('commonFunctions', () => {
     expect(await hashText('magi')).toBe(md5('magi'));
   });
 
+  test('hashes raw ArrayBuffers with MD5 like Workers do', async () => {
+    const bytes = new TextEncoder().encode('magi');
+    const digest = await crypto.subtle.digest('MD5', bytes.buffer);
+    expect(Buffer.from(digest).toString('hex')).toBe(md5('magi'));
+  });
+
   test('leaves other digest algorithms to Web Crypto', async () => {
     const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('magi'));
     expect(Buffer.from(digest).toString('hex')).toBe(
