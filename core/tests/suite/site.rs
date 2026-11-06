@@ -66,6 +66,13 @@ mod routing {
     }
 
     #[test]
+    fn answers_dotted_multi_segment_paths_itself() {
+        let fake = Fake::new();
+        assert_eq!(answer(&fake, &get("/a/style.css")).status, 404);
+        assert!(fake.gets.borrow().is_empty());
+    }
+
+    #[test]
     fn treats_function_paths_as_ghosts_for_other_methods() {
         let fake = Fake::new();
         for path in ["/manage", "/telegram"] {

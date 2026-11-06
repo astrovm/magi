@@ -100,6 +100,20 @@ mod text {
         assert_eq!(format_date(1_735_603_200_000), "2024-12-31");
         assert_eq!(format_date(1_735_689_600_000), "2025-01-01");
         assert_eq!(format_date(951_782_400_000), "2000-02-29");
+        // Around the century rules of the calendar.
+        for (ms, date) in [
+            (946_598_400_000, "1999-12-31"),
+            (951_868_800_000, "2000-03-01"),
+            (3_981_312_000_000, "2096-02-29"),
+            (4_107_456_000_000, "2100-02-28"),
+            (4_107_542_400_000, "2100-03-01"),
+            (4_133_894_400_000, "2100-12-31"),
+            (13_574_563_200_000, "2400-02-29"),
+            (13_574_649_600_000, "2400-03-01"),
+            (13_569_379_200_000, "2399-12-31"),
+        ] {
+            assert_eq!(format_date(ms), date);
+        }
         assert_eq!(format_date_time(1_791_462_600_000), "2026-10-08 12:30 UTC");
     }
 }
@@ -303,6 +317,8 @@ mod secrets {
         assert!(timing_safe_equal("abc", "abc"));
         assert!(!timing_safe_equal("abc", "abd"));
         assert!(!timing_safe_equal("abc", "ab"));
+        // Two differences that would cancel out if they were only XORed together.
+        assert!(!timing_safe_equal("ab", "ba"));
     }
 }
 
@@ -1149,6 +1165,17 @@ mod pages_and_responses {
         assert!(svg.contains(r#"<rect fill="white""#));
         assert!(svg.contains(r#"<path fill="black" d="M"#));
         assert!(svg.ends_with("</svg>"));
+    }
+
+    #[test]
+    fn places_every_qr_module_on_the_grid() {
+        // Version 1: 21 modules plus a border of 2 on each side, 10 units each.
+        let svg = render_svg("a");
+        assert!(svg.contains(r#"viewBox="0 0 250 250""#));
+        assert!(svg.contains(r#"width="250" height="250""#));
+        // Top row and left column of the corner square, past the border.
+        assert!(svg.contains(r#"d="M20,20h10v10h-10zM30,20h10v10h-10z"#));
+        assert!(svg.contains("M20,30h10v10h-10z"));
     }
 
     #[test]

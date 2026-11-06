@@ -51,9 +51,6 @@ pub async fn verify_password<P: Platform>(
     let Some((salt, expected)) = stored.split_once('.') else {
         return Ok(false);
     };
-    if salt.is_empty() || expected.is_empty() {
-        return Ok(false);
-    }
     let Ok(salt) = URL_SAFE_NO_PAD.decode(salt) else {
         return Ok(false);
     };
