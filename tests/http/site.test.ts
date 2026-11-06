@@ -59,7 +59,7 @@ describe('GET /orb', () => {
 describe('POST /orb', () => {
   test('creates a link and answers with a fragment', async () => {
     const stored = uniqueAlias('Cool');
-    const { html, key, status } = await create({ alias: ` ${stored.replace('-', '%20')} ` });
+    const { html, key, status } = await create({ alias: ` ${stored.replaceAll('-', '%20')} ` });
     expect(status).toBe(201);
     expect(html).not.toContain('<!DOCTYPE html>');
     expect(html).toContain('the worm summoned your link');
@@ -203,7 +203,7 @@ describe('visiting a link', () => {
     const alias = uniqueAlias('Big-Spell');
     await create({ alias });
     expect((await go(`/${alias.toUpperCase()}`)).status).toBe(301);
-    expect((await go(`/${alias.replace('-', '%20')}`)).status).toBe(301);
+    expect((await go(`/${alias.replaceAll('-', '%20')}`)).status).toBe(301);
     expect((await go(`/${alias}%2B`)).status).toBe(200);
   });
 
