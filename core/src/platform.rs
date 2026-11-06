@@ -104,7 +104,7 @@ pub enum FormValue {
 }
 
 /// Every form field the server reads, so the runtime knows what to copy over.
-pub const FORM_FIELDS: [&str; 12] = [
+pub const FORM_FIELDS: [&str; 13] = [
     "action",
     "alias",
     "burn",
@@ -115,6 +115,7 @@ pub const FORM_FIELDS: [&str; 12] = [
     "fortune",
     "key",
     "password",
+    "text",
     "url",
     "wait",
 ];

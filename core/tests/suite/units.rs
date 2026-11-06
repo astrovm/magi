@@ -15,8 +15,8 @@ use magi_core::secrets::{
 };
 use magi_core::spells::{MAX_FORTUNES, parse_fortunes, parse_spells, parse_target};
 use magi_core::store::{
-    LINK_CACHE_TTL, LinkMeta, LinkRecord, add_click, clicks_key, delete_link, get_clicks, get_link,
-    put_link,
+    LINK_CACHE_TTL, LinkKind, LinkMeta, LinkRecord, add_click, clicks_key, delete_link, get_clicks,
+    get_link, put_link,
 };
 use magi_core::target::{MAX_URL_LENGTH, Target, header_value, with_scheme};
 use magi_core::telegram::{describe_device, describe_place, parse_command};
@@ -125,7 +125,7 @@ mod alias {
     fn exposes_the_limits() {
         assert_eq!(MAX_ALIAS_LENGTH, 13312);
         assert_eq!(MAX_URL_LENGTH, 2048);
-        assert_eq!(RESERVED_ALIASES, ["orb", "manage", "telegram"]);
+        assert_eq!(RESERVED_ALIASES, ["orb", "manage", "paste", "telegram"]);
     }
 
     #[test]
@@ -1122,6 +1122,7 @@ mod pages_and_responses {
                 manage_key: "<k>",
                 alias: r#"a"b"#,
                 telegram_bot: Some(r#"Bot""#),
+                kind: LinkKind::Link,
             },
         );
         let html = body(&response);
@@ -1148,6 +1149,7 @@ mod pages_and_responses {
                     manage_key: "k",
                     alias: "a",
                     telegram_bot: None,
+                    kind: LinkKind::Link,
                 },
             );
             assert!(

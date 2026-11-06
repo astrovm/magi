@@ -5,6 +5,7 @@ pub mod alias;
 pub mod guards;
 pub mod html;
 pub mod pages;
+pub mod paste;
 pub mod platform;
 pub mod qr;
 pub mod responses;

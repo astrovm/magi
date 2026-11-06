@@ -1,7 +1,7 @@
 use crate::html::{PageOptions, render_page};
 use crate::platform::Res;
 use crate::responses::{ORB_LINK_NOT_FOUND_MESSAGE, Tone, orb_message};
-use crate::store::LinkRecord;
+use crate::store::{LinkKind, LinkRecord};
 use crate::target::header_value;
 use crate::text::{escape_html, format_date, format_date_time};
 
@@ -40,8 +40,9 @@ pub enum UnlockState {
     Locked,
 }
 
-pub fn unlock_page(alias: &str, state: UnlockState) -> Res {
+pub fn unlock_page(alias: &str, state: UnlockState, raw: bool) -> Res {
     let safe_alias = escape_html(alias);
+    let query = if raw { "?raw" } else { "" };
     let (status, error) = match state {
         UnlockState::Ask => (200, String::new()),
         UnlockState::Wrong => (403, orb_message(WRONG_PASSWORD_MESSAGE, Tone::Error)),
@@ -50,9 +51,9 @@ pub fn unlock_page(alias: &str, state: UnlockState) -> Res {
     render_page(
         &format!(
             r#"<img src="/orb.webp" alt="" class="card-art card-art--orb" />
-<h1 class="card-title">🔒 this link is guarded</h1>
+<h1 class="card-title">🔒 this one is guarded</h1>
 <p class="hint">say the magic word.</p>
-<form method="post" action="/{safe_alias}" class="spell-form">
+<form method="post" action="/{safe_alias}{query}" class="spell-form">
   <input type="password" name="password" placeholder="magic word" aria-label="Password" required autofocus />
   <button type="submit" class="btn">Unlock</button>
 </form>
@@ -87,6 +88,10 @@ pub struct PreviewDetails<'a> {
 }
 
 fn destination_fact(record: &LinkRecord) -> String {
+    if record.meta.kind == LinkKind::Paste {
+        let size = record.url.len().div_ceil(1024);
+        return fact("holds", &format!("📋 a paste, {size} KB"));
+    }
     if record.meta.pw.is_some() {
         return fact("goes to", "🔒 a secret. the orb is sworn to silence.");
     }
@@ -186,4 +191,49 @@ pub fn countdown_page(target: &str) -> Res {
             status: None,
         },
     )
+}
+
+/// Only what the page itself needs. Manage keys live in this origin's browser
+/// storage, so nothing in a paste may ever run here.
+const PASTE_PAGE_POLICY: &str = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
+
+pub fn paste_page(alias: &str, record: &LinkRecord) -> Res {
+    let safe_alias = escape_html(alias);
+    let safe_text = escape_html(&record.url);
+    // Opening the raw text counts as a visit, and could be the last one.
+    let raw_link = if record.meta.max.is_none() {
+        format!(r#"<a class="chip" href="/{safe_alias}?raw">raw</a>"#)
+    } else {
+        String::new()
+    };
+    let mut headers = private_headers();
+    headers.push(("Content-Security-Policy", PASTE_PAGE_POLICY.to_owned()));
+    headers.push(("X-Content-Type-Options", "nosniff".to_owned()));
+    render_page(
+        &format!(
+            r##"<div class="paste">
+<h1 class="card-title">📋 {safe_alias}</h1>
+<div class="btn-row">
+  <button type="button" class="chip copy-btn" data-copy-from="#paste-text">copy</button>
+  {raw_link}
+</div>
+<pre class="paste-text" id="paste-text" tabindex="0">{safe_text}</pre>
+</div>"##
+        ),
+        PageOptions {
+            title: Some(alias),
+            headers,
+            status: None,
+        },
+    )
+}
+
+/// The text alone. It can't render or run as anything but text.
+pub fn raw_text(text: &str) -> Res {
+    Res::new(200)
+        .with_header("Content-Type", "text/plain; charset=utf-8")
+        .with_header("X-Content-Type-Options", "nosniff")
+        .with_header("Content-Security-Policy", "default-src 'none'; sandbox")
+        .with_header("Cache-Control", "no-store")
+        .with_body(text)
 }

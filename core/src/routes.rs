@@ -8,8 +8,10 @@ use crate::guards::{
     passes_turnstile,
 };
 use crate::pages::{
-    PreviewDetails, UnlockState, countdown_page, not_found_page, preview_page, unlock_page,
+    PreviewDetails, UnlockState, countdown_page, not_found_page, paste_page, preview_page,
+    raw_text, unlock_page,
 };
+use crate::paste::{DEFAULT_PASTE_SECONDS, check_text, find_urls, normalize_text};
 use crate::platform::{Body, Config, Form, Method, Outcome, Platform, Req, Res, Result};
 use crate::responses::{
     CreatedLink, ORB_LINK_NOT_FOUND_MESSAGE, ORB_WRONG_KEY_MESSAGE, ResponseKey, get_response,
@@ -17,7 +19,7 @@ use crate::responses::{
 };
 use crate::secrets::{hash_password, random_token, sha256_hex, timing_safe_equal, verify_password};
 use crate::spells::{parse_fortunes, parse_spells, parse_target};
-use crate::store::{LinkMeta, LinkRecord, delete_link, get_clicks, get_link, put_link};
+use crate::store::{LinkKind, LinkMeta, LinkRecord, delete_link, get_clicks, get_link, put_link};
 use crate::telegram::{TelegramCommand, parse_command, send_message};
 use crate::text::js_trim;
 use crate::visits::{Background, Visit, needs_every_visit, pick_destination, redirect_to};
@@ -25,6 +27,9 @@ use crate::words::summon_wizard_words;
 
 const RANDOM_ALIAS_ATTEMPTS: u32 = 5;
 const MANAGE_KEY_BYTES: usize = 16;
+
+/// Stands in for the destination in visit alerts: the text stays out of Telegram.
+const PASTE_VISIT_LABEL: &str = "📋 the paste";
 
 const TELEGRAM_HELP: &str = "hi, i'm the orb's snitch 🔮\nsend /alert <alias> <manage key> and i'll ping you when someone opens that link.\nsend it again to make me stop.";
 
@@ -90,6 +95,36 @@ async fn orb_get<P: Platform>(platform: &P, config: &Config, req: &Req) -> Resul
     ))
 }
 
+/// What a visitor has to pass before creating anything.
+async fn check_visitor<P: Platform>(
+    platform: &P,
+    config: &Config,
+    req: &Req,
+    form: &Form,
+) -> Result<std::result::Result<String, ResponseKey>> {
+    let create_key = limit_key("create", req);
+    if is_limited(platform, &create_key, CREATE_LIMIT).await? {
+        return Ok(Err(ResponseKey::TooMany));
+    }
+    let token = form.text("cf-turnstile-response");
+    if !passes_turnstile(platform, config.turnstile_secret_key.as_deref(), token, req).await {
+        return Ok(Err(ResponseKey::NotHuman));
+    }
+    Ok(Ok(create_key))
+}
+
+async fn claim_from_form<P: Platform>(
+    platform: &P,
+    form: &Form,
+) -> Result<std::result::Result<Claimed, ResponseKey>> {
+    let alias_field = form.text("alias").unwrap_or_default();
+    if js_trim(alias_field).is_empty() {
+        claim_random_alias(platform).await
+    } else {
+        claim_custom_alias(platform, alias_field).await
+    }
+}
+
 async fn orb_post<P: Platform>(platform: &P, config: &Config, req: &Req) -> Result<Res> {
     let Some(form) = req.form() else {
         return Ok(get_response(req, ResponseKey::InvalidRequest));
@@ -101,14 +136,10 @@ async fn orb_post<P: Platform>(platform: &P, config: &Config, req: &Req) -> Resu
         return Ok(get_response(req, ResponseKey::InvalidRequest));
     }
 
-    let create_key = limit_key("create", req);
-    if is_limited(platform, &create_key, CREATE_LIMIT).await? {
-        return Ok(get_response(req, ResponseKey::TooMany));
-    }
-    let token = form.text("cf-turnstile-response");
-    if !passes_turnstile(platform, config.turnstile_secret_key.as_deref(), token, req).await {
-        return Ok(get_response(req, ResponseKey::NotHuman));
-    }
+    let create_key = match check_visitor(platform, config, req, form).await? {
+        Ok(create_key) => create_key,
+        Err(key) => return Ok(get_response(req, key)),
+    };
 
     let now = platform.now_ms();
     let Some(spells) = parse_spells(form, now) else {
@@ -136,13 +167,7 @@ async fn orb_post<P: Platform>(platform: &P, config: &Config, req: &Req) -> Resu
         return Ok(get_response(req, ResponseKey::DangerUrl));
     }
 
-    let alias_field = form.text("alias").unwrap_or_default();
-    let claimed = if js_trim(alias_field).is_empty() {
-        claim_random_alias(platform).await?
-    } else {
-        claim_custom_alias(platform, alias_field).await?
-    };
-    let claimed = match claimed {
+    let claimed = match claim_from_form(platform, form).await? {
         Ok(claimed) => claimed,
         Err(key) => return Ok(get_response(req, key)),
     };
@@ -176,8 +201,114 @@ async fn orb_post<P: Platform>(platform: &P, config: &Config, req: &Req) -> Resu
             manage_key: &manage_key,
             alias: &claimed.alias,
             telegram_bot: config.telegram_bot_username.as_deref(),
+            kind: LinkKind::Link,
         },
     ))
+}
+
+async fn paste_post<P: Platform>(platform: &P, config: &Config, req: &Req) -> Result<Res> {
+    let Some(form) = req.form() else {
+        return Ok(get_response(req, ResponseKey::InvalidRequest));
+    };
+    let Some(text) = form.text("text") else {
+        return Ok(get_response(req, ResponseKey::InvalidRequest));
+    };
+    if form.is_file("alias") {
+        return Ok(get_response(req, ResponseKey::InvalidRequest));
+    }
+
+    let create_key = match check_visitor(platform, config, req, form).await? {
+        Ok(create_key) => create_key,
+        Err(key) => return Ok(get_response(req, key)),
+    };
+
+    let now = platform.now_ms();
+    let Some(spells) = parse_spells(form, now) else {
+        return Ok(get_response(req, ResponseKey::BadSpell));
+    };
+    let text = normalize_text(text);
+    if let Err(key) = check_text(&text) {
+        return Ok(get_response(req, key));
+    }
+    let urls = find_urls(&text);
+    if is_dangerous(platform, config.safe_browsing_api_key.as_deref(), &urls).await {
+        return Ok(get_response(req, ResponseKey::DangerUrl));
+    }
+    let claimed = match claim_from_form(platform, form).await? {
+        Ok(claimed) => claimed,
+        Err(key) => return Ok(get_response(req, key)),
+    };
+
+    let manage_key = random_token(platform, MANAGE_KEY_BYTES)?;
+    let pw = match &spells.password {
+        Some(password) => Some(hash_password(platform, password).await?),
+        None => None,
+    };
+    // Leaving the choice out means the default. Choosing "never" sends it empty.
+    let exp = if form.get("expires").is_none() {
+        Some(now / 1000 + DEFAULT_PASTE_SECONDS)
+    } else {
+        spells.meta.exp
+    };
+    count_attempt(platform, &create_key, CREATE_LIMIT).await?;
+    put_link(
+        platform,
+        &claimed.alias_hash,
+        &LinkRecord {
+            url: text,
+            more: Vec::new(),
+            meta: LinkMeta {
+                kind: LinkKind::Paste,
+                created: Some(now),
+                key: Some(sha256_hex(&manage_key)),
+                pw,
+                max: spells.meta.max,
+                count: spells.meta.count,
+                exp,
+                ..LinkMeta::default()
+            },
+        },
+    )
+    .await?;
+
+    Ok(link_created(
+        req,
+        &CreatedLink {
+            short_url: &format!("{}/{}", req.origin(), claimed.alias),
+            manage_key: &manage_key,
+            alias: &claimed.alias,
+            telegram_bot: config.telegram_bot_username.as_deref(),
+            kind: LinkKind::Paste,
+        },
+    ))
+}
+
+async fn transmute_paste<P: Platform>(
+    platform: &P,
+    config: &Config,
+    req: &Req,
+    alias_hash: &str,
+    record: LinkRecord,
+) -> Result<Res> {
+    let field = req.form().and_then(|form| form.text("text"));
+    let text = normalize_text(field.unwrap_or_default());
+    if let Err(key) = check_text(&text) {
+        return Ok(get_response(req, key));
+    }
+    let urls = find_urls(&text);
+    if is_dangerous(platform, config.safe_browsing_api_key.as_deref(), &urls).await {
+        return Ok(get_response(req, ResponseKey::DangerUrl));
+    }
+    put_link(
+        platform,
+        alias_hash,
+        &LinkRecord {
+            url: text,
+            ..record
+        },
+    )
+    .await?;
+    Ok(get_response(req, ResponseKey::LinkTransmuted))
 }
 
 fn holds_key(record: &LinkRecord, key: &str) -> bool {
@@ -212,6 +343,9 @@ async fn manage_post<P: Platform>(platform: &P, config: &Config, req: &Req) -> R
     if action == Some("banish") {
         delete_link(platform, &alias_hash).await?;
         return Ok(get_response(req, ResponseKey::LinkBanished));
+    }
+    if record.meta.kind == LinkKind::Paste {
+        return transmute_paste(platform, config, req, &alias_hash, record).await;
     }
 
     let target = match parse_target(form.text("url").unwrap_or_default(), &req.host()) {
@@ -334,17 +468,29 @@ async fn visit<P: Platform>(
         });
     }
 
-    let target = pick_destination(record, || platform.random());
     let tracked = needs_every_visit(record);
+    let (target, response) = match meta.kind {
+        LinkKind::Paste if req.query("raw").is_some() => {
+            (PASTE_VISIT_LABEL.to_owned(), raw_text(&record.url))
+        }
+        LinkKind::Paste => (
+            PASTE_VISIT_LABEL.to_owned(),
+            paste_page(&lookup.alias, record),
+        ),
+        LinkKind::Link => {
+            let target = pick_destination(record, || platform.random());
+            let response = if meta.wait && req.method != Method::Head {
+                countdown_page(&target)
+            } else {
+                redirect_to(&target, !tracked)
+            };
+            (target, response)
+        }
+    };
     // HEAD is what link checkers send: answer like GET, but it isn't a visit.
     if req.method == Method::Head {
-        return Ok(redirect_to(&target, !tracked).into());
+        return Ok(response.into());
     }
-    let response = if meta.wait {
-        countdown_page(&target)
-    } else {
-        redirect_to(&target, !tracked)
-    };
     let background = tracked.then(|| {
         Background::RecordVisit(Box::new(Visit {
             alias_hash: lookup.alias_hash.clone(),
@@ -380,7 +526,7 @@ async fn alias_get<P: Platform>(platform: &P, req: &Req, raw: &str) -> Result<Ou
         .into());
     }
     if record.meta.pw.is_some() {
-        return Ok(unlock_page(&lookup.alias, UnlockState::Ask).into());
+        return Ok(unlock_page(&lookup.alias, UnlockState::Ask, req.query("raw").is_some()).into());
     }
     visit(platform, req, &lookup, record).await
 }
@@ -400,13 +546,14 @@ async fn alias_post<P: Platform>(platform: &P, req: &Req, raw: &str) -> Result<O
         return visit(platform, req, &lookup, record).await;
     };
 
+    let raw = req.query("raw").is_some();
     let unlock_key = limit_key(&format!("unlock:{}", lookup.alias_hash), req);
     if is_limited(platform, &unlock_key, UNLOCK_LIMIT).await? {
-        return Ok(unlock_page(&lookup.alias, UnlockState::Locked).into());
+        return Ok(unlock_page(&lookup.alias, UnlockState::Locked, raw).into());
     }
     if !verify_password(platform, password, stored).await? {
         count_attempt(platform, &unlock_key, UNLOCK_LIMIT).await?;
-        return Ok(unlock_page(&lookup.alias, UnlockState::Wrong).into());
+        return Ok(unlock_page(&lookup.alias, UnlockState::Wrong, raw).into());
     }
     visit(platform, req, &lookup, record).await
 }
@@ -423,6 +570,7 @@ pub async fn handle<P: Platform>(platform: &P, config: &Config, req: &Req) -> Re
         (Method::Get | Method::Head, "") => Ok(Outcome::Asset),
         (Method::Get, "orb") => Ok(orb_get(platform, config, req).await?.into()),
         (Method::Post, "orb") => Ok(orb_post(platform, config, req).await?.into()),
+        (Method::Post, "paste") => Ok(paste_post(platform, config, req).await?.into()),
         (Method::Post, "manage") => Ok(manage_post(platform, config, req).await?.into()),
         (Method::Post, "telegram") => Ok(telegram_post(platform, config, req).await?.into()),
         (Method::Post, _) if single_segment => alias_post(platform, req, path).await,

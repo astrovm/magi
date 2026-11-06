@@ -1,11 +1,13 @@
 use crate::html::{HTML_CONTENT_TYPE, PageOptions, render_page};
 use crate::platform::{Req, Res};
 use crate::qr::render_svg;
+use crate::store::LinkKind;
 use crate::text::escape_html;
 
 pub const ORB_LINK_NOT_FOUND_MESSAGE: &str = "the orb didn't found this link.";
 pub const ORB_WRONG_KEY_MESSAGE: &str = "the orb doesn't recognize that manage key.";
 const WORM_LINK_CREATED_MESSAGE: &str = "the worm summoned your link";
+const WORM_PASTE_CREATED_MESSAGE: &str = "the worm summoned your paste";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ResponseKey {
@@ -24,6 +26,8 @@ pub enum ResponseKey {
     LinkTransmuted,
     LinkBanished,
     ServerError,
+    EmptyPaste,
+    PasteTooBig,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -35,6 +39,16 @@ pub enum Tone {
 impl ResponseKey {
     pub fn details(self) -> (&'static str, u16, Tone) {
         match self {
+            Self::EmptyPaste => (
+                "the orb can't summon nothing. paste some text.",
+                400,
+                Tone::Error,
+            ),
+            Self::PasteTooBig => (
+                "that paste is too heavy for the orb. 512 KB at most.",
+                413,
+                Tone::Error,
+            ),
             Self::InvalidRequest => ("the orb rejected your request.", 400, Tone::Error),
             Self::InvalidAlias => ("the orb rejected your alias.", 400, Tone::Error),
             Self::InvalidUrl => ("the orb rejected your invalid url.", 400, Tone::Error),
@@ -125,6 +139,7 @@ pub struct CreatedLink<'a> {
     pub manage_key: &'a str,
     pub alias: &'a str,
     pub telegram_bot: Option<&'a str>,
+    pub kind: LinkKind,
 }
 
 fn link_created_html(link: &CreatedLink<'_>) -> String {
@@ -133,6 +148,7 @@ fn link_created_html(link: &CreatedLink<'_>) -> String {
         manage_key,
         alias,
         telegram_bot,
+        kind,
     } = link;
     let label = short_url
         .strip_prefix("https://")
@@ -149,7 +165,13 @@ fn link_created_html(link: &CreatedLink<'_>) -> String {
             r#"<p class="hint">📡 visit alerts: send <code>{alert_command}</code> to <a href="https://t.me/{safe_bot}">@{safe_bot}</a></p>"#
         )
     });
-    let created = orb_message(WORM_LINK_CREATED_MESSAGE, Tone::Success);
+    let created = orb_message(
+        match kind {
+            LinkKind::Link => WORM_LINK_CREATED_MESSAGE,
+            LinkKind::Paste => WORM_PASTE_CREATED_MESSAGE,
+        },
+        Tone::Success,
+    );
     let short_row = copy_row(
         &format!(r#"<a class="short-link" href="{safe_url}">{short_label}</a>"#),
         short_url,

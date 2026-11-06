@@ -9,11 +9,23 @@ use crate::platform::{Platform, PutOptions, Result};
 /// self-destructs show up quickly.
 pub const LINK_CACHE_TTL: u64 = 300;
 
+/// What an alias holds. Links stored before pastes existed don't say, and that
+/// means a link.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LinkKind {
+    #[default]
+    Link,
+    Paste,
+}
+
 /// Extra spells stored as KV metadata next to the destination. Links created
 /// before these existed have no metadata at all. Keys are short because KV
 /// metadata is capped at 1024 bytes.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LinkMeta {
+    #[serde(default, skip_serializing_if = "is_link")]
+    pub kind: LinkKind,
     /// Creation time in epoch milliseconds.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub created: Option<u64>,
@@ -48,8 +60,13 @@ fn is_false(value: &bool) -> bool {
     !*value
 }
 
+fn is_link(kind: &LinkKind) -> bool {
+    *kind == LinkKind::Link
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LinkRecord {
+    /// The destination, or the whole text of a paste.
     pub url: String,
     /// Extra fortune cookie destinations, picked at random with `url`.
     pub more: Vec<String>,
@@ -67,13 +84,21 @@ pub async fn get_link<P: Platform>(platform: &P, alias_hash: &str) -> Result<Opt
     else {
         return Ok(None);
     };
+    let meta = meta.unwrap_or_default();
+    if meta.kind != LinkKind::Link {
+        return Ok(Some(LinkRecord {
+            url: value,
+            more: Vec::new(),
+            meta,
+        }));
+    }
     // Fortune cookie links store every destination, one per line.
     let mut lines = value.split('\n').map(str::to_owned);
     let url = lines.next().unwrap_or_default();
     Ok(Some(LinkRecord {
         url,
         more: lines.collect(),
-        meta: meta.unwrap_or_default(),
+        meta,
     }))
 }
 

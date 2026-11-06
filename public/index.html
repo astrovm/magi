@@ -40,10 +40,22 @@
     <div class="altar">
       <div class="column">
         <section class="card">
-          <form action="/orb" method="post" class="spell-form" data-orb="#orb-res" data-reset>
-            <label for="url">long sad link</label>
+          <div class="tabs" role="tablist" aria-label="What to summon" id="summon-tabs">
+            <button type="button" role="tab" class="tab" id="tab-link" aria-selected="true" aria-controls="summon-form"
+              data-tab="link" data-action="/orb" data-label="Summon link" data-expires="">🔗 link</button>
+            <button type="button" role="tab" class="tab" id="tab-paste" aria-selected="false" aria-controls="summon-form"
+              tabindex="-1" data-tab="paste" data-action="/paste" data-label="Summon paste"
+              data-expires="2592000">📋 paste</button>
+          </div>
+          <form action="/orb" method="post" class="spell-form" id="summon-form" role="tabpanel"
+            aria-labelledby="tab-link" data-orb="#orb-res" data-reset>
+            <label for="url" data-only="link">long sad link</label>
             <input type="text" inputmode="url" name="url" id="url" placeholder="paste it here" autocomplete="off"
-              required />
+              required data-only="link" />
+
+            <label for="text" data-only="paste" hidden>your text</label>
+            <textarea name="text" id="text" rows="8" class="paste-field" placeholder="paste it here, up to 512 KB"
+              spellcheck="false" required disabled hidden data-only="paste"></textarea>
 
             <label for="alias">alias</label>
             <div class="alias-field">
@@ -72,22 +84,22 @@
                   </select>
                 </label>
                 <label class="check"><input type="checkbox" name="count" /> 📊 count visits</label>
-                <label class="check"><input type="checkbox" name="cursed" /> ☠️ curse it (10% rickroll)</label>
-                <label class="check"><input type="checkbox" name="wait" /> ⏳ 5 second countdown</label>
-                <label class="wide">🥠 fortune cookie: also go to one of these
+                <label class="check" data-only="link"><input type="checkbox" name="cursed" /> ☠️ curse it (10% rickroll)</label>
+                <label class="check" data-only="link"><input type="checkbox" name="wait" /> ⏳ 5 second countdown</label>
+                <label class="wide" data-only="link">🥠 fortune cookie: also go to one of these
                   <textarea name="fortune" rows="3" placeholder="one link per line, up to 9"></textarea>
                 </label>
               </div>
             </details>
 
             <div class="turnstile" id="turnstile"></div>
-            <button type="submit" class="btn btn--big">Summon link</button>
+            <button type="submit" class="btn btn--big" id="summon-button">Summon link</button>
           </form>
           <div id="orb-res" class="orb-res" aria-live="polite"></div>
         </section>
 
         <details class="card card--small manage">
-          <summary>🪄 manage a link</summary>
+          <summary>🪄 manage a link or paste</summary>
           <form action="/manage" method="post" class="spell-form" data-orb="#manage-res">
             <label for="manage-alias">alias</label>
             <input type="text" name="alias" id="manage-alias" autocomplete="off" autocapitalize="off" spellcheck="false"
@@ -95,7 +107,9 @@
             <label for="manage-key">manage key</label>
             <input type="password" name="key" id="manage-key" autocomplete="off" required />
             <label for="manage-url">new link</label>
-            <input type="text" inputmode="url" name="url" id="manage-url" placeholder="only to transmute" autocomplete="off" />
+            <input type="text" inputmode="url" name="url" id="manage-url" placeholder="only to transmute a link" autocomplete="off" />
+            <label for="manage-text">new text</label>
+            <textarea name="text" id="manage-text" rows="3" placeholder="only to transmute a paste" spellcheck="false"></textarea>
             <div class="btn-row">
               <button type="submit" name="action" value="transmute" class="btn">Transmute</button>
               <button type="submit" name="action" value="banish" class="btn btn--danger" data-confirm="banish this link forever?">Banish</button>
@@ -124,6 +138,7 @@
 
   <footer class="footer">
     <p>add <code>+</code> to any link to peek before you click</p>
+    <p>pastes aren't a safe for secrets: self-destruct is approximate</p>
     <p>made with 🪱 by <a href="https://github.com/astrovm/magi">astrovm</a></p>
   </footer>
 </body>

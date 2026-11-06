@@ -44,6 +44,17 @@ export const create = async (
   return { alias, key, html, status: response.status };
 };
 
+export const createPaste = async (
+  fields: Record<string, string | Blob> = {},
+  headers?: Record<string, string>,
+): Promise<Created> => {
+  const alias = String(fields.alias ?? uniqueAlias('paste'));
+  const response = await post('/paste', { text: 'hello from the orb', alias, ...fields }, headers);
+  const html = await response.text();
+  const key = html.match(/data-key="([^"]+)"/)?.[1] ?? '';
+  return { alias, key, html, status: response.status };
+};
+
 export const telegram = (text: unknown, secret = TELEGRAM_SECRET): Promise<Response> =>
   go('/telegram', {
     method: 'POST',
