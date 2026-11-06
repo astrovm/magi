@@ -108,3 +108,7 @@ dist
 
 # wrangler dev state
 .wrangler/
+
+# Rust
+target/
+build/
