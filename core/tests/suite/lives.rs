@@ -95,6 +95,7 @@ mod creating {
         assert_eq!(meta.kind, LinkKind::Live);
         assert_eq!(meta.key, Some(sha256_hex(&manage_key_of(html))));
         assert_eq!(meta.exp, None);
+        assert!(meta.created.is_some());
 
         let view_key = Alias::new(view_alias).hash();
         let stored = fake
@@ -133,6 +134,12 @@ mod creating {
         let fake = Fake::new();
         let huge = "a".repeat(512 * 1024 + 1);
         assert_eq!(create(&fake, &[("text", &huge)]).status, 413);
+        let most = "a".repeat(512 * 1024);
+        assert_eq!(
+            create(&fake, &[("alias", "full"), ("text", &most)]).status,
+            201
+        );
+        fake.room_calls.borrow_mut().clear();
         assert_eq!(create(&fake, &[("alias", "no.dots")]).status, 400);
         fake.store("taken", "https://example.com", None);
         assert_eq!(create(&fake, &[("alias", "taken")]).status, 409);

@@ -1220,3 +1220,24 @@ mod pages_and_responses {
         assert_eq!(req.origin(), "http://localhost:8788");
     }
 }
+
+#[test]
+fn what_a_record_is_survives_storage_and_links_stay_as_they_were() {
+    use magi_core::store::{LinkKind, LinkMeta};
+    let link = serde_json::to_string(&LinkMeta::default()).expect("json");
+    assert!(!link.contains("kind"));
+    for (kind, name) in [
+        (LinkKind::Paste, "paste"),
+        (LinkKind::Live, "live"),
+        (LinkKind::View, "view"),
+    ] {
+        let stored = serde_json::to_string(&LinkMeta {
+            kind,
+            ..LinkMeta::default()
+        })
+        .expect("json");
+        assert!(stored.contains(&format!(r#""kind":"{name}""#)));
+        let read: LinkMeta = serde_json::from_str(&stored).expect("json");
+        assert_eq!(read.kind, kind);
+    }
+}

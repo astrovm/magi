@@ -982,3 +982,114 @@ fn agrees_with_going_round_until_nothing_moves() {
         "{accepted} / {refused}"
     );
 }
+
+mod exact_limits {
+    use super::*;
+
+    const LAST_CLOCK: u64 = 1 << 31;
+
+    fn acceptable(wire: &Wire, known: &[(u64, u64)]) -> bool {
+        let frame = wire.sent();
+        let Some(SyncFrame::Update(update)) = parse_sync_frame(&frame) else {
+            panic!("expected an update");
+        };
+        is_acceptable_update(update, "codemirror", &known.iter().copied().collect())
+    }
+
+    #[test]
+    fn an_edit_that_exactly_fills_the_room_goes_in() {
+        let mut room = Room::create("");
+        let empty = room.save().len();
+        let update_size = |frame: &[u8]| {
+            let Some(SyncFrame::Update(update)) = parse_sync_frame(frame) else {
+                panic!("expected an update");
+            };
+            update.len()
+        };
+        // The text's length takes the same 3 bytes at any size around here.
+        let sample = 100_000;
+        let around = "a".repeat(sample);
+        let overhead = update_size(&plain_update("codemirror", &around)) - sample;
+        let room_for_text = MAX_STATE_BYTES - empty - overhead;
+
+        let exact = plain_update("codemirror", &"a".repeat(room_for_text));
+        assert_eq!(empty + update_size(&exact), MAX_STATE_BYTES);
+        assert!(room.receive(Role::Edit, false, &exact).changed);
+
+        let mut full = Room::create("");
+        full.save();
+        let over = plain_update("codemirror", &"a".repeat(room_for_text + 1));
+        assert_eq!(
+            full.receive(Role::Edit, false, &over).to_sender,
+            vec![notice(NOTICE_FULL)]
+        );
+    }
+
+    #[test]
+    fn the_real_size_decides_when_the_estimate_is_over() {
+        let client = Client::new();
+        let edits: Vec<_> = (0..20).map(|at| client.type_text(at, "a")).collect();
+        let mut learned = Room::create("");
+        let mut room = Room::create("");
+        for edit in &edits {
+            learned.receive(Role::Edit, false, edit);
+            assert!(room.receive(Role::Edit, false, edit).changed);
+        }
+        let real_size = learned.save().len();
+
+        let sample = 100_000;
+        let frame = plain_update("codemirror", &"a".repeat(sample));
+        let Some(SyncFrame::Update(update)) = parse_sync_frame(&frame) else {
+            panic!("expected an update");
+        };
+        let overhead = update.len() - sample;
+        let text = "a".repeat(MAX_STATE_BYTES - real_size - overhead);
+        let exact = plain_update("codemirror", &text);
+        assert!(room.receive(Role::Edit, false, &exact).changed);
+    }
+
+    #[test]
+    fn a_block_can_end_on_the_last_clock_but_an_origin_cannot_be_there() {
+        let mut ends_there = Wire::default();
+        ends_there
+            .number(1)
+            .number(1)
+            .number(7)
+            .number(LAST_CLOCK - 1);
+        ends_there
+            .byte(4)
+            .number(1)
+            .text("codemirror")
+            .text("x")
+            .number(0);
+        assert!(acceptable(&ends_there, &[(7, LAST_CLOCK - 1)]));
+
+        let origin = |clock: u64| {
+            let mut wire = Wire::default();
+            wire.number(1).number(1).number(7).number(0);
+            wire.byte(4 | 0x80).number(8).number(clock).text("x");
+            wire.number(0);
+            wire
+        };
+        let known = [(8, LAST_CLOCK + 1)];
+        assert!(acceptable(&origin(LAST_CLOCK - 1), &known));
+        assert!(!acceptable(&origin(LAST_CLOCK), &known));
+    }
+
+    #[test]
+    fn a_delete_can_reach_the_end_of_what_is_known_and_no_further() {
+        let delete = |length: u64| {
+            let mut wire = Wire::default();
+            wire.number(0).number(1).number(7).number(1);
+            wire.number(1).number(length);
+            wire
+        };
+        assert!(acceptable(&delete(2), &[(7, 3)]));
+        assert!(!acceptable(&delete(3), &[(7, 3)]));
+    }
+}
+
+#[test]
+fn a_room_lasts_30_days_without_edits() {
+    assert_eq!(IDLE_LIFETIME_MS, 30 * 86_400_000);
+}
