@@ -4,8 +4,9 @@
   "main": "build/index.js",
   "compatibility_date": "2026-11-06",
   "build": {
-    "command": "worker-build --release",
-    "watch_dir": ["src", "core/src"]
+    // The editor's browser code, then the Worker.
+    "command": "bun run build:live && worker-build --release",
+    "watch_dir": ["src", "core/src", "client"]
   },
   "assets": {
     "directory": "./public",
@@ -20,6 +21,10 @@
       "id": "links"
     }
   ],
+  "durable_objects": {
+    "bindings": [{ "name": "LIVE", "class_name": "LiveRoom" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["LiveRoom"] }],
   "observability": {
     "enabled": true,
     "traces": { "enabled": true }

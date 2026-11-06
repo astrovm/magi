@@ -10,6 +10,7 @@ It shrinks links. Mostly.
 - **Custom or random aliases**: leave the alias empty and the worm picks one, like `sneaky-worm-42`.
 - **Paste without `https://`**: `example.com` works.
 - **Paste**: text instead of a link, with the same aliases, password, self-destruct, expiration, count, peek, QR and manage key. Lasts 30 days unless you pick otherwise. Up to 512 KB, shown as plain text, with `?raw` for the text alone. Self-destruct is approximate, so don't use it for real secrets.
+- **Live paste**: tick **live** and everyone with the link edits together, with cursors and all. You also get a view-only link. Your browser gets the owner tools: **Lock**, **Banish** and restoring the last 20 versions. It disappears after 30 days without edits.
 - **Peek**: add `+` to any link (`s.4st.li/cool+`) to see where it goes before clicking.
 - **Password**: visitors have to say the magic word.
 - **Self-destruct**: the link dies after N visits.

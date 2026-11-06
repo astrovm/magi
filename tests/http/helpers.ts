@@ -61,3 +61,5 @@ export const telegram = (text: unknown, secret = TELEGRAM_SECRET): Promise<Respo
     headers: { 'X-Telegram-Bot-Api-Secret-Token': secret, 'Content-Type': 'application/json' },
     body: JSON.stringify({ message: { text, chat: { id: 99 } } }),
   });
+
+export const WS_BASE = BASE.replace(/^http/, 'ws');

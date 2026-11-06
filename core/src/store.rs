@@ -17,6 +17,10 @@ pub enum LinkKind {
     #[default]
     Link,
     Paste,
+    /// The value is the alias of its view-only link.
+    Live,
+    /// A view-only link. The value is the alias hash of the live paste.
+    View,
 }
 
 /// Extra spells stored as KV metadata next to the destination. Links created

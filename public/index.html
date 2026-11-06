@@ -57,6 +57,10 @@
             <textarea name="text" id="text" rows="8" class="paste-field" placeholder="paste it here, up to 512 KB"
               spellcheck="false" required disabled hidden data-only="paste"></textarea>
 
+            <label class="check" data-only="paste" hidden>
+              <input type="checkbox" name="live" id="live-toggle" disabled /> ✍️ live: anyone with the link can edit together
+            </label>
+
             <label for="alias">alias</label>
             <div class="alias-field">
               <span class="prefix" data-host>s.4st.li/</span>
@@ -65,7 +69,7 @@
               <span class="alias-status" id="alias-status" aria-live="polite"></span>
             </div>
 
-            <details class="spells">
+            <details class="spells" id="summon-spells">
               <summary>✨ extra spells</summary>
               <div class="spell-grid">
                 <label>🔒 password

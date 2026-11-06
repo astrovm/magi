@@ -9,6 +9,19 @@ export default [
   js.configs.recommended,
   ...tsPlugin.configs['flat/recommended'],
   {
+    files: ['client/**/*.js'],
+    languageOptions: {
+      globals: {
+        confirm: 'readonly',
+        document: 'readonly',
+        fetch: 'readonly',
+        FormData: 'readonly',
+        localStorage: 'readonly',
+        location: 'readonly',
+      },
+    },
+  },
+  {
     files: ['**/*.ts'],
     languageOptions: {
       parser: tsParser,

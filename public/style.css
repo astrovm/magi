@@ -652,6 +652,43 @@ textarea {
   outline-offset: 2px;
 }
 
+/* a live paste */
+
+.live-status {
+  margin: 8px 0 12px;
+  font-weight: 600;
+  color: var(--gold);
+}
+
+.live-editor {
+  text-align: left;
+  margin-bottom: 12px;
+}
+
+.live-owner {
+  margin-top: 12px;
+  text-align: left;
+}
+
+.live-owner summary {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.live .btn {
+  min-height: 48px;
+}
+
+.live .link-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  overflow-wrap: anywhere;
+}
+
 /* countdown */
 
 .countdown-number {

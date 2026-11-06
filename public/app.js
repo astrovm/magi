@@ -282,6 +282,13 @@ function applyTab(tab) {
     each.setAttribute('aria-selected', String(selected));
     each.tabIndex = selected ? 0 : -1;
   });
+  const spells = document.getElementById('summon-spells');
+  spells.hidden = false;
+  spells.querySelectorAll('input, select, textarea').forEach((field) => {
+    field.disabled = false;
+  });
+  pasteText.required = true;
+  liveToggle.checked = false;
   summonForm.setAttribute('action', tab.dataset.action);
   summonForm.setAttribute('aria-labelledby', tab.id);
   summonForm.querySelector('#summon-button').textContent = tab.dataset.label;
@@ -296,6 +303,20 @@ function applyTab(tab) {
     element.querySelectorAll('input, textarea').forEach((field) => { field.disabled = !shown; });
   });
 }
+
+// Live pastes have an editor and owner tools instead of spells. Their text can
+// start empty, too.
+const liveToggle = document.getElementById('live-toggle');
+const pasteText = document.getElementById('text');
+liveToggle?.addEventListener('change', () => {
+  const spells = document.getElementById('summon-spells');
+  spells.hidden = liveToggle.checked;
+  spells.querySelectorAll('input, select, textarea').forEach((field) => {
+    field.disabled = liveToggle.checked || field.closest('[data-only="link"]') !== null;
+  });
+  pasteText.required = !liveToggle.checked;
+  document.getElementById('summon-button').textContent = liveToggle.checked ? 'Summon live paste' : 'Summon paste';
+});
 
 summonTabs.forEach((tab, index) => {
   tab.addEventListener('click', () => applyTab(tab));
@@ -384,7 +405,7 @@ document.addEventListener('click', async (event) => {
   button.textContent = 'copied ✨';
   button.classList.add('copied');
   setTimeout(() => {
-    button.textContent = 'copy';
+    button.textContent = button.dataset.label ?? 'copy';
     button.classList.remove('copied');
   }, 1500);
 });

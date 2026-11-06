@@ -985,6 +985,7 @@ mod pages_and_responses {
                 title: Some("<lost>"),
                 status: Some(418),
                 headers: vec![("X-Test", "1".to_owned())],
+                script: Some("/extra.js"),
             },
         );
         assert_eq!(page.status, 418);
@@ -995,6 +996,7 @@ mod pages_and_responses {
         );
         let html = body(&page);
         assert!(html.contains("<title>&lt;lost&gt; | Magi</title>"));
+        assert!(html.contains(r#"<script src="/extra.js" defer></script>"#));
         assert!(html.contains(r#"<section class="card"><p>hi</p></section>"#));
         let plain = render_page("x", PageOptions::default());
         assert_eq!(plain.status, 200);
@@ -1123,6 +1125,7 @@ mod pages_and_responses {
                 alias: r#"a"b"#,
                 telegram_bot: Some(r#"Bot""#),
                 kind: LinkKind::Link,
+                view_url: None,
             },
         );
         let html = body(&response);
@@ -1150,6 +1153,7 @@ mod pages_and_responses {
                     alias: "a",
                     telegram_bot: None,
                     kind: LinkKind::Link,
+                    view_url: None,
                 },
             );
             assert!(

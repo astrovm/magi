@@ -5,6 +5,7 @@ use std::future::Future;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
+use crate::live::Role;
 use crate::store::LinkMeta;
 use crate::target::host_with_port;
 use crate::visits::Background;
@@ -61,6 +62,13 @@ pub trait Platform {
         salt: &[u8],
         iterations: u32,
     ) -> impl Future<Output = Result<Vec<u8>>>;
+    /// Calls a live paste's room. `path` is one of the `ROOM_*` paths.
+    fn live_call(
+        &self,
+        room: &str,
+        path: &str,
+        body: String,
+    ) -> impl Future<Output = Result<HttpReply>>;
     /// Not for secrets: picks silly aliases and curse victims. In `0..1`.
     fn random(&self) -> f64;
     fn random_bytes(&self, length: usize) -> Result<Vec<u8>>;
@@ -104,7 +112,7 @@ pub enum FormValue {
 }
 
 /// Every form field the server reads, so the runtime knows what to copy over.
-pub const FORM_FIELDS: [&str; 13] = [
+pub const FORM_FIELDS: [&str; 15] = [
     "action",
     "alias",
     "burn",
@@ -114,7 +122,9 @@ pub const FORM_FIELDS: [&str; 13] = [
     "expires",
     "fortune",
     "key",
+    "live",
     "password",
+    "snapshot",
     "text",
     "url",
     "wait",
@@ -181,6 +191,10 @@ pub struct Req {
     pub user_agent: String,
     pub telegram_secret: String,
     pub place: Place,
+    /// The request asks to become a WebSocket.
+    pub is_websocket: bool,
+    /// The `Origin` header. Browsers always send it on a WebSocket.
+    pub origin_header: Option<String>,
 }
 
 impl Req {
@@ -194,6 +208,8 @@ impl Req {
             user_agent: String::new(),
             telegram_secret: String::new(),
             place: Place::default(),
+            is_websocket: false,
+            origin_header: None,
         }
     }
 
@@ -263,6 +279,8 @@ pub enum Outcome {
         /// Work to finish after answering.
         background: Option<Background>,
     },
+    /// Hand the request over to a live paste's room.
+    LiveSocket { room: String, role: Role },
 }
 
 impl From<Res> for Outcome {

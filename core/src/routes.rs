@@ -7,12 +7,18 @@ use crate::guards::{
     CREATE_LIMIT, UNLOCK_LIMIT, count_attempt, is_dangerous, is_limited, limit_key,
     passes_turnstile,
 };
-use crate::pages::{
-    PreviewDetails, UnlockState, countdown_page, not_found_page, paste_page, preview_page,
-    raw_text, unlock_page,
+use crate::live::{
+    ROOM_INIT, ROOM_LOCK, ROOM_RESTORE, ROOM_SNAPSHOTS, ROOM_TEXT, ROOM_UNLOCK, ROOM_WIPE, Role,
+    RoomInit,
 };
-use crate::paste::{DEFAULT_PASTE_SECONDS, check_text, find_urls, normalize_text};
-use crate::platform::{Body, Config, Form, Method, Outcome, Platform, Req, Res, Result};
+use crate::pages::{
+    LivePage, PreviewDetails, UnlockState, countdown_page, live_page, not_found_page, paste_page,
+    preview_page, raw_text, unlock_page,
+};
+use crate::paste::{DEFAULT_PASTE_SECONDS, MAX_PASTE_BYTES, check_text, find_urls, normalize_text};
+use crate::platform::{
+    Body, Config, Form, Method, Outcome, Platform, PlatformError, Req, Res, Result,
+};
 use crate::responses::{
     CreatedLink, ORB_LINK_NOT_FOUND_MESSAGE, ORB_WRONG_KEY_MESSAGE, ResponseKey, get_response,
     link_created,
@@ -30,6 +36,10 @@ const MANAGE_KEY_BYTES: usize = 16;
 
 /// Stands in for the destination in visit alerts: the text stays out of Telegram.
 const PASTE_VISIT_LABEL: &str = "📋 the paste";
+const LIVE_SOCKET_PREFIX: &str = "paste/ws/";
+const LIVE_VISIT_LABEL: &str = "✍️ the live paste";
+/// How unguessable a view-only link is.
+const VIEW_ALIAS_BYTES: usize = 16;
 
 const TELEGRAM_HELP: &str = "hi, i'm the orb's snitch 🔮\nsend /alert <alias> <manage key> and i'll ping you when someone opens that link.\nsend it again to make me stop.";
 
@@ -202,6 +212,7 @@ async fn orb_post<P: Platform>(platform: &P, config: &Config, req: &Req) -> Resu
             alias: &claimed.alias,
             telegram_bot: config.telegram_bot_username.as_deref(),
             kind: LinkKind::Link,
+            view_url: None,
         },
     ))
 }
@@ -221,6 +232,10 @@ async fn paste_post<P: Platform>(platform: &P, config: &Config, req: &Req) -> Re
         Ok(create_key) => create_key,
         Err(key) => return Ok(get_response(req, key)),
     };
+
+    if form.is_on("live") {
+        return live_post(platform, config, req, form, text, &create_key).await;
+    }
 
     let now = platform.now_ms();
     let Some(spells) = parse_spells(form, now) else {
@@ -279,8 +294,159 @@ async fn paste_post<P: Platform>(platform: &P, config: &Config, req: &Req) -> Re
             alias: &claimed.alias,
             telegram_bot: config.telegram_bot_username.as_deref(),
             kind: LinkKind::Paste,
+            view_url: None,
         },
     ))
+}
+
+/// A live paste is two aliases and a room: one alias edits, the other is a
+/// random one that can only watch and doesn't reveal the first.
+async fn live_post<P: Platform>(
+    platform: &P,
+    config: &Config,
+    req: &Req,
+    form: &Form,
+    text: &str,
+    create_key: &str,
+) -> Result<Res> {
+    let text = normalize_text(text);
+    if text.len() > MAX_PASTE_BYTES {
+        return Ok(get_response(req, ResponseKey::PasteTooBig));
+    }
+    let urls = find_urls(&text);
+    if is_dangerous(platform, config.safe_browsing_api_key.as_deref(), &urls).await {
+        return Ok(get_response(req, ResponseKey::DangerUrl));
+    }
+    let claimed = match claim_from_form(platform, form).await? {
+        Ok(claimed) => claimed,
+        Err(key) => return Ok(get_response(req, key)),
+    };
+
+    let manage_key = random_token(platform, MANAGE_KEY_BYTES)?;
+    let view_alias = random_token(platform, VIEW_ALIAS_BYTES)?;
+    let view_hash = Alias::new(&view_alias).hash();
+    let now = platform.now_ms();
+    count_attempt(platform, create_key, CREATE_LIMIT).await?;
+
+    // The room comes first. If the rest fails, it cleans up after itself.
+    let init = RoomInit {
+        text,
+        link_hash: claimed.alias_hash.clone(),
+        view_hash: view_hash.clone(),
+    };
+    // Strings always serialize. An empty body would only get the room to refuse.
+    let body = serde_json::to_string(&init).unwrap_or_default();
+    let reply = platform
+        .live_call(&claimed.alias_hash, ROOM_INIT, body)
+        .await?;
+    if reply.status != 200 {
+        return Err(PlatformError(format!("room init: {}", reply.status)));
+    }
+    let base = LinkMeta {
+        created: Some(now),
+        ..LinkMeta::default()
+    };
+    put_link(
+        platform,
+        &view_hash,
+        &LinkRecord {
+            url: claimed.alias_hash.clone(),
+            more: Vec::new(),
+            meta: LinkMeta {
+                kind: LinkKind::View,
+                ..base.clone()
+            },
+        },
+    )
+    .await?;
+    put_link(
+        platform,
+        &claimed.alias_hash,
+        &LinkRecord {
+            url: view_alias.clone(),
+            more: Vec::new(),
+            meta: LinkMeta {
+                kind: LinkKind::Live,
+                key: Some(sha256_hex(&manage_key)),
+                ..base
+            },
+        },
+    )
+    .await?;
+
+    let origin = req.origin();
+    Ok(link_created(
+        req,
+        &CreatedLink {
+            short_url: &format!("{origin}/{}", claimed.alias),
+            manage_key: &manage_key,
+            alias: &claimed.alias,
+            telegram_bot: config.telegram_bot_username.as_deref(),
+            kind: LinkKind::Live,
+            view_url: Some(&format!("{origin}/{view_alias}")),
+        },
+    ))
+}
+
+/// What the owner of a live paste can do, with the manage key already checked.
+async fn manage_live<P: Platform>(
+    platform: &P,
+    req: &Req,
+    alias_hash: &str,
+    record: &LinkRecord,
+    action: &str,
+) -> Result<Res> {
+    match action {
+        "banish" => {
+            platform
+                .live_call(alias_hash, ROOM_WIPE, String::new())
+                .await?;
+            delete_link(platform, &Alias::new(&record.url).hash()).await?;
+            delete_link(platform, alias_hash).await?;
+            Ok(get_response(req, ResponseKey::LinkBanished))
+        }
+        "lock" => {
+            platform
+                .live_call(alias_hash, ROOM_LOCK, String::new())
+                .await?;
+            Ok(get_response(req, ResponseKey::LiveLocked))
+        }
+        "unlock" => {
+            platform
+                .live_call(alias_hash, ROOM_UNLOCK, String::new())
+                .await?;
+            Ok(get_response(req, ResponseKey::LiveUnlocked))
+        }
+        "snapshots" => {
+            let reply = platform
+                .live_call(alias_hash, ROOM_SNAPSHOTS, String::new())
+                .await?;
+            Ok(Res::new(reply.status)
+                .with_header("Content-Type", "application/json; charset=utf-8")
+                .with_header("Cache-Control", "no-store")
+                .with_body(reply.body))
+        }
+        "restore" => {
+            let id = req
+                .form()
+                .and_then(|form| form.text("snapshot"))
+                .and_then(|snapshot| snapshot.parse::<u32>().ok());
+            let Some(id) = id else {
+                return Ok(get_response(req, ResponseKey::InvalidRequest));
+            };
+            let path = format!("{ROOM_RESTORE}{id}");
+            let reply = platform.live_call(alias_hash, &path, String::new()).await?;
+            Ok(get_response(
+                req,
+                if reply.status == 200 {
+                    ResponseKey::LiveRestored
+                } else {
+                    ResponseKey::InvalidRequest
+                },
+            ))
+        }
+        _ => Ok(get_response(req, ResponseKey::LiveNoTransmute)),
+    }
 }
 
 async fn transmute_paste<P: Platform>(
@@ -326,8 +492,11 @@ async fn manage_post<P: Platform>(platform: &P, config: &Config, req: &Req) -> R
     let alias_field = form.text("alias").filter(|field| !field.is_empty());
     let key_field = form.text("key").filter(|field| !field.is_empty());
     let action = form.text("action");
-    let (Some(alias_field), Some(key_field), Some("transmute" | "banish")) =
-        (alias_field, key_field, action)
+    let (
+        Some(alias_field),
+        Some(key_field),
+        Some(action @ ("transmute" | "banish" | "lock" | "unlock" | "snapshots" | "restore")),
+    ) = (alias_field, key_field, action)
     else {
         return Ok(get_response(req, ResponseKey::InvalidRequest));
     };
@@ -340,7 +509,13 @@ async fn manage_post<P: Platform>(platform: &P, config: &Config, req: &Req) -> R
         return Ok(get_response(req, ResponseKey::WrongKey));
     }
 
-    if action == Some("banish") {
+    if record.meta.kind == LinkKind::Live {
+        return manage_live(platform, req, &alias_hash, &record, action).await;
+    }
+    if !matches!(action, "transmute" | "banish") {
+        return Ok(get_response(req, ResponseKey::InvalidRequest));
+    }
+    if action == "banish" {
         delete_link(platform, &alias_hash).await?;
         return Ok(get_response(req, ResponseKey::LinkBanished));
     }
@@ -449,6 +624,43 @@ async fn look_up<P: Platform>(platform: &P, raw: &str) -> Result<Option<Lookup>>
     }))
 }
 
+/// The live paste an alias belongs to, and what visitors can do with it.
+fn live_room(lookup: &Lookup, record: &LinkRecord) -> Option<(String, Role)> {
+    match record.meta.kind {
+        LinkKind::Live => Some((lookup.alias_hash.clone(), Role::Edit)),
+        LinkKind::View => Some((record.url.clone(), Role::View)),
+        LinkKind::Link | LinkKind::Paste => None,
+    }
+}
+
+async fn live_response<P: Platform>(
+    platform: &P,
+    req: &Req,
+    lookup: &Lookup,
+    record: &LinkRecord,
+    room: &str,
+    role: Role,
+) -> Result<Res> {
+    if req.query("raw").is_some() {
+        let reply = platform.live_call(room, ROOM_TEXT, String::new()).await?;
+        if reply.status != 200 {
+            return Ok(not_found_page());
+        }
+        return Ok(raw_text(&reply.body));
+    }
+    let origin = req.origin();
+    let host = req.host();
+    let edit_url = format!("{origin}/{}", lookup.alias);
+    let view_url = format!("{origin}/{}", record.url);
+    Ok(live_page(&LivePage {
+        alias: &lookup.alias,
+        host: &host,
+        role,
+        edit_url: &edit_url,
+        view_url: (role == Role::Edit).then_some(view_url.as_str()),
+    }))
+}
+
 async fn visit<P: Platform>(
     platform: &P,
     req: &Req,
@@ -476,6 +688,22 @@ async fn visit<P: Platform>(
         LinkKind::Paste => (
             PASTE_VISIT_LABEL.to_owned(),
             paste_page(&lookup.alias, record),
+        ),
+        LinkKind::Live => (
+            LIVE_VISIT_LABEL.to_owned(),
+            live_response(
+                platform,
+                req,
+                lookup,
+                record,
+                &lookup.alias_hash,
+                Role::Edit,
+            )
+            .await?,
+        ),
+        LinkKind::View => (
+            LIVE_VISIT_LABEL.to_owned(),
+            live_response(platform, req, lookup, record, &record.url, Role::View).await?,
         ),
         LinkKind::Link => {
             let target = pick_destination(record, || platform.random());
@@ -558,12 +786,43 @@ async fn alias_post<P: Platform>(platform: &P, req: &Req, raw: &str) -> Result<O
     visit(platform, req, &lookup, record).await
 }
 
+/// `GET /paste/ws/<alias>` connects a browser to the room behind an alias.
+async fn live_socket<P: Platform>(platform: &P, req: &Req, raw: &str) -> Result<Outcome> {
+    if !req.is_websocket {
+        return Ok(Res::new(426).with_header("Upgrade", "websocket").into());
+    }
+    // A link is all it takes to get in, but other sites shouldn't get to use
+    // their visitors' browsers for it.
+    let origin = req.origin();
+    if req
+        .origin_header
+        .as_deref()
+        .is_some_and(|sent| sent != origin)
+    {
+        return Ok(Res::new(403).into());
+    }
+    let room = match look_up(platform, raw).await? {
+        Some(lookup) => lookup
+            .record
+            .as_ref()
+            .and_then(|record| live_room(&lookup, record)),
+        None => None,
+    };
+    Ok(match room {
+        Some((room, role)) => Outcome::LiveSocket { room, role },
+        None => Res::new(404).into(),
+    })
+}
+
 /// Answers one request.
 pub async fn handle<P: Platform>(platform: &P, config: &Config, req: &Req) -> Result<Outcome> {
     let path = req.url.path();
     let path = path.strip_suffix('/').unwrap_or(path);
     let path = path.strip_prefix('/').unwrap_or(path);
 
+    if let (Method::Get, Some(raw)) = (req.method, path.strip_prefix(LIVE_SOCKET_PREFIX)) {
+        return live_socket(platform, req, raw).await;
+    }
     let single_segment = !path.is_empty() && !path.contains('/');
     match (req.method, path) {
         (Method::Other, _) => Ok(Res::new(405).into()),

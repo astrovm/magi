@@ -1,4 +1,5 @@
 use crate::html::{PageOptions, render_page};
+use crate::live::Role;
 use crate::platform::Res;
 use crate::responses::{ORB_LINK_NOT_FOUND_MESSAGE, Tone, orb_message};
 use crate::store::{LinkKind, LinkRecord};
@@ -29,6 +30,7 @@ pub fn not_found_page() -> Res {
             status: Some(404),
             title: Some("lost"),
             headers: private_headers(),
+            script: None,
         },
     )
 }
@@ -63,6 +65,7 @@ pub fn unlock_page(alias: &str, state: UnlockState, raw: bool) -> Res {
             status: Some(status),
             title: Some("guarded"),
             headers: private_headers(),
+            script: None,
         },
     )
 }
@@ -88,9 +91,14 @@ pub struct PreviewDetails<'a> {
 }
 
 fn destination_fact(record: &LinkRecord) -> String {
-    if record.meta.kind == LinkKind::Paste {
-        let size = record.url.len().div_ceil(1024);
-        return fact("holds", &format!("📋 a paste, {size} KB"));
+    match record.meta.kind {
+        LinkKind::Paste => {
+            let size = record.url.len().div_ceil(1024);
+            return fact("holds", &format!("📋 a paste, {size} KB"));
+        }
+        LinkKind::Live => return fact("holds", "✍️ a live paste anyone can edit"),
+        LinkKind::View => return fact("holds", "👀 a live paste, view only"),
+        LinkKind::Link => {}
     }
     if record.meta.pw.is_some() {
         return fact("goes to", "🔒 a secret. the orb is sworn to silence.");
@@ -163,6 +171,7 @@ pub fn preview_page(details: &PreviewDetails<'_>) -> Res {
             title: Some(alias),
             headers: private_headers(),
             status: None,
+            script: None,
         },
     )
 }
@@ -189,6 +198,7 @@ pub fn countdown_page(target: &str) -> Res {
             title: Some("charging"),
             headers,
             status: None,
+            script: None,
         },
     )
 }
@@ -224,6 +234,94 @@ pub fn paste_page(alias: &str, record: &LinkRecord) -> Res {
             title: Some(alias),
             headers,
             status: None,
+            script: None,
+        },
+    )
+}
+
+pub struct LivePage<'a> {
+    pub alias: &'a str,
+    pub host: &'a str,
+    pub role: Role,
+    /// Full links to share, for people who can edit.
+    pub edit_url: &'a str,
+    pub view_url: Option<&'a str>,
+}
+
+fn copy_chip(label: &str, value: &str) -> String {
+    let value = escape_html(value);
+    format!(
+        r#"<button type="button" class="chip copy-btn" data-copy="{value}" data-label="{label}">{label}</button>"#
+    )
+}
+
+/// The page for a live paste. The editor brings its own inline styles.
+pub fn live_page(page: &LivePage<'_>) -> Res {
+    let LivePage {
+        alias,
+        host,
+        role,
+        edit_url,
+        view_url,
+    } = page;
+    let safe_alias = escape_html(alias);
+    let (heading, hint, share) = match role {
+        Role::Edit => (
+            "✍️",
+            "everyone with this link can edit. changes show up live.",
+            [
+                copy_chip("copy link", edit_url),
+                view_url.map_or_else(String::new, |view_url| {
+                    copy_chip("copy view-only link", view_url)
+                }),
+            ]
+            .concat(),
+        ),
+        Role::View => ("👀", "view only. changes show up live.", String::new()),
+    };
+    let owner = match role {
+        Role::Edit => {
+            r#"<details class="live-owner" id="live-owner" hidden>
+  <summary>🔑 owner tools</summary>
+  <div class="btn-row">
+    <button type="button" class="btn" data-owner="lock">Lock</button>
+    <button type="button" class="btn" data-owner="unlock">Unlock</button>
+    <button type="button" class="btn btn--danger" data-owner="banish">Banish</button>
+  </div>
+  <p class="hint">⏪ earlier versions</p>
+  <ul class="link-list" id="live-snapshots"></ul>
+  <div id="live-owner-result" class="orb-res" aria-live="polite"></div>
+</details>"#
+        }
+        Role::View => "",
+    };
+    let policy = format!(
+        "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; connect-src 'self' ws://{host} wss://{host}; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+    );
+    let mut headers = private_headers();
+    headers.push(("Content-Security-Policy", policy));
+    headers.push(("X-Content-Type-Options", "nosniff".to_owned()));
+    render_page(
+        &format!(
+            r#"<div class="paste live" id="live" data-alias="{safe_alias}" data-role="{role}">
+<h1 class="card-title">{heading} {safe_alias}</h1>
+<p class="hint">{hint} it disappears after 30 days without edits.</p>
+<p class="live-status" id="live-status" role="status">connecting…</p>
+<div class="live-editor" id="live-editor"></div>
+<noscript><p class="hint">the editor needs JavaScript, but you can <a href="/{safe_alias}?raw">read the text</a> without it.</p></noscript>
+<div class="btn-row">
+  {share}
+  <a class="chip" href="/{safe_alias}?raw">raw</a>
+</div>
+{owner}
+</div>"#,
+            role = role.as_str(),
+        ),
+        PageOptions {
+            title: Some(alias),
+            headers,
+            status: None,
+            script: Some("/live.js"),
         },
     )
 }

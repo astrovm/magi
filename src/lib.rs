@@ -1,6 +1,9 @@
 //! Plugs the site into Cloudflare. Everything it does lives in `magi-core`.
 
+mod room;
+
 use js_sys::{Array, Math, Object, Reflect, Uint8Array};
+use magi_core::live::ROOM_SOCKET;
 use magi_core::platform::{
     Body, Config, FORM_FIELDS, Form, FormValue, HttpReply, Method as CoreMethod, Outcome, Place,
     Platform, PlatformError, PutOptions, Req, Res, Result as CoreResult,
@@ -13,7 +16,8 @@ use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use worker::kv::KvStore;
 use worker::{
-    Context, Env, Fetch, FormEntry, Headers, Method, Request, RequestInit, Response, Result, event,
+    Context, Env, Fetch, FormEntry, Headers, Method, ObjectNamespace, Request, RequestInit,
+    Response, Result, event,
 };
 
 fn platform_error(error: impl std::fmt::Debug) -> PlatformError {
@@ -28,6 +32,7 @@ fn log_error(context: &str, error: &str) {
 
 struct Cloudflare {
     links: KvStore,
+    rooms: ObjectNamespace,
 }
 
 fn web_crypto() -> CoreResult<web_sys::Crypto> {
@@ -117,6 +122,27 @@ impl Platform for Cloudflare {
         Ok(Uint8Array::new(&bits).to_vec())
     }
 
+    async fn live_call(&self, room: &str, path: &str, body: String) -> CoreResult<HttpReply> {
+        let mut init = RequestInit::new();
+        init.with_method(Method::Post)
+            .with_body(Some(JsValue::from_str(&body)));
+        let request = Request::new_with_init(&format!("https://room{path}"), &init)
+            .map_err(platform_error)?;
+        let stub = self
+            .rooms
+            .id_from_name(room)
+            .and_then(|id| id.get_stub())
+            .map_err(platform_error)?;
+        let mut response = stub
+            .fetch_with_request(request)
+            .await
+            .map_err(platform_error)?;
+        Ok(HttpReply {
+            status: response.status_code(),
+            body: response.text().await.map_err(platform_error)?,
+        })
+    }
+
     fn random(&self) -> f64 {
         Math::random()
     }
@@ -196,6 +222,9 @@ async fn read_request(request: &mut Request) -> Result<Req> {
     req.visitor_ip = header(request, "CF-Connecting-IP");
     req.user_agent = header(request, "User-Agent").unwrap_or_default();
     req.telegram_secret = header(request, "X-Telegram-Bot-Api-Secret-Token").unwrap_or_default();
+    req.is_websocket =
+        header(request, "Upgrade").is_some_and(|upgrade| upgrade.eq_ignore_ascii_case("websocket"));
+    req.origin_header = header(request, "Origin");
     req.place = Place {
         city: cf.and_then(worker::Cf::city),
         country: cf.and_then(worker::Cf::country),
@@ -220,11 +249,25 @@ async fn fetch(mut request: Request, env: Env, context: Context) -> Result<Respo
     let config = read_config(&env);
     let platform = Cloudflare {
         links: env.kv("links")?,
+        rooms: env.durable_object("LIVE")?,
     };
     let req = read_request(&mut request).await?;
 
     match handle(&platform, &config, &req).await {
         Ok(Outcome::Asset) => env.assets("ASSETS")?.fetch_request(request).await,
+        Ok(Outcome::LiveSocket { room, role }) => {
+            let headers = Headers::new();
+            headers.set("Upgrade", "websocket")?;
+            let mut init = RequestInit::new();
+            init.with_headers(headers);
+            let url = format!("https://room{ROOM_SOCKET}?role={}", role.as_str());
+            let upgrade = Request::new_with_init(&url, &init)?;
+            let stub = env
+                .durable_object("LIVE")?
+                .id_from_name(&room)?
+                .get_stub()?;
+            stub.fetch_with_request(upgrade).await
+        }
         Ok(Outcome::Reply {
             response,
             background,

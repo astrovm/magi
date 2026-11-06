@@ -8,6 +8,8 @@ pub const ORB_LINK_NOT_FOUND_MESSAGE: &str = "the orb didn't found this link.";
 pub const ORB_WRONG_KEY_MESSAGE: &str = "the orb doesn't recognize that manage key.";
 const WORM_LINK_CREATED_MESSAGE: &str = "the worm summoned your link";
 const WORM_PASTE_CREATED_MESSAGE: &str = "the worm summoned your paste";
+const WORM_LIVE_CREATED_MESSAGE: &str =
+    "the worm summoned your live paste. anyone with this link can edit it";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ResponseKey {
@@ -28,6 +30,10 @@ pub enum ResponseKey {
     ServerError,
     EmptyPaste,
     PasteTooBig,
+    LiveNoTransmute,
+    LiveLocked,
+    LiveUnlocked,
+    LiveRestored,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -39,6 +45,14 @@ pub enum Tone {
 impl ResponseKey {
     pub fn details(self) -> (&'static str, u16, Tone) {
         match self {
+            Self::LiveNoTransmute => (
+                "live pastes get edited on their own page.",
+                400,
+                Tone::Error,
+            ),
+            Self::LiveLocked => ("🔒 locked. nobody can edit it now.", 200, Tone::Success),
+            Self::LiveUnlocked => ("🔓 unlocked. everyone can edit again.", 200, Tone::Success),
+            Self::LiveRestored => ("⏪ the worm rewound the text.", 200, Tone::Success),
             Self::EmptyPaste => (
                 "the orb can't summon nothing. paste some text.",
                 400,
@@ -140,6 +154,8 @@ pub struct CreatedLink<'a> {
     pub alias: &'a str,
     pub telegram_bot: Option<&'a str>,
     pub kind: LinkKind,
+    /// A live paste's view-only link.
+    pub view_url: Option<&'a str>,
 }
 
 fn link_created_html(link: &CreatedLink<'_>) -> String {
@@ -149,6 +165,7 @@ fn link_created_html(link: &CreatedLink<'_>) -> String {
         alias,
         telegram_bot,
         kind,
+        view_url,
     } = link;
     let label = short_url
         .strip_prefix("https://")
@@ -169,6 +186,7 @@ fn link_created_html(link: &CreatedLink<'_>) -> String {
         match kind {
             LinkKind::Link => WORM_LINK_CREATED_MESSAGE,
             LinkKind::Paste => WORM_PASTE_CREATED_MESSAGE,
+            LinkKind::Live | LinkKind::View => WORM_LIVE_CREATED_MESSAGE,
         },
         Tone::Success,
     );
@@ -176,6 +194,14 @@ fn link_created_html(link: &CreatedLink<'_>) -> String {
         &format!(r#"<a class="short-link" href="{safe_url}">{short_label}</a>"#),
         short_url,
     );
+    let view_row = view_url.map_or_else(String::new, |view_url| {
+        let safe_view = escape_html(view_url);
+        let row = copy_row(
+            &format!(r#"<a class="short-link" href="{safe_view}">{safe_view}</a>"#),
+            view_url,
+        );
+        format!(r#"<p class="hint">👀 view-only link</p>{row}"#)
+    });
     let key_row = copy_row(
         &format!(r#"<code class="secret">{safe_key}</code>"#),
         manage_key,
@@ -187,6 +213,7 @@ fn link_created_html(link: &CreatedLink<'_>) -> String {
         r#"<div class="summoned" data-alias="{safe_alias}" data-short="{safe_url}" data-key="{safe_key}">
   {created}
   {short_row}
+  {view_row}
   <p class="hint">🔍 peek first: <a href="{safe_url}+">{short_label}+</a></p>
   <details class="qr">
     <summary>📱 QR code</summary>

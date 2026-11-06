@@ -32,6 +32,8 @@ pub struct Fake {
     pub replies: RefCell<VecDeque<Result<HttpReply>>>,
     pub now: Cell<u64>,
     pub broken_kv: Cell<bool>,
+    pub room_calls: RefCell<Vec<(String, String, String)>>,
+    pub room_replies: RefCell<VecDeque<HttpReply>>,
     next_byte: Cell<u8>,
 }
 
@@ -47,6 +49,8 @@ impl Fake {
             replies: RefCell::default(),
             now: Cell::new(1_800_000_000_000),
             broken_kv: Cell::new(false),
+            room_calls: RefCell::default(),
+            room_replies: RefCell::default(),
             next_byte: Cell::new(1),
         }
     }
@@ -171,6 +175,20 @@ impl Platform for Fake {
         Ok(out.to_vec())
     }
 
+    async fn live_call(&self, room: &str, path: &str, body: String) -> Result<HttpReply> {
+        self.room_calls
+            .borrow_mut()
+            .push((room.to_owned(), path.to_owned(), body));
+        Ok(self
+            .room_replies
+            .borrow_mut()
+            .pop_front()
+            .unwrap_or(HttpReply {
+                status: 200,
+                body: String::new(),
+            }))
+    }
+
     fn random(&self) -> f64 {
         self.randoms
             .borrow_mut()
@@ -256,7 +274,7 @@ pub fn parts(outcome: Outcome) -> (Res, Option<Background>) {
             response,
             background,
         } => (response, background),
-        Outcome::Asset => panic!("expected a reply, got the static site"),
+        other => panic!("expected a reply, got {other:?}"),
     }
 }
 
