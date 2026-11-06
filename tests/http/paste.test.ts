@@ -91,6 +91,7 @@ describe('managing a paste', () => {
     await Bun.sleep(100);
     const banished = await post('/manage', { alias, key, action: 'banish' });
     expect(banished.status).toBe(200);
+    expect(await banished.text()).toContain('banished your paste');
   });
 
   test('a wrong key changes nothing', async () => {

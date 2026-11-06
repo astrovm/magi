@@ -403,7 +403,7 @@ async fn manage_live<P: Platform>(
                 .await?;
             delete_link(platform, &Alias::new(&record.url).hash()).await?;
             delete_link(platform, alias_hash).await?;
-            Ok(get_response(req, ResponseKey::LinkBanished))
+            Ok(get_response(req, ResponseKey::PasteBanished))
         }
         "lock" => {
             platform
@@ -474,7 +474,7 @@ async fn transmute_paste<P: Platform>(
         },
     )
     .await?;
-    Ok(get_response(req, ResponseKey::LinkTransmuted))
+    Ok(get_response(req, ResponseKey::PasteTransmuted))
 }
 
 fn holds_key(record: &LinkRecord, key: &str) -> bool {
@@ -517,7 +517,12 @@ async fn manage_post<P: Platform>(platform: &P, config: &Config, req: &Req) -> R
     }
     if action == "banish" {
         delete_link(platform, &alias_hash).await?;
-        return Ok(get_response(req, ResponseKey::LinkBanished));
+        let banished = if record.meta.kind == LinkKind::Paste {
+            ResponseKey::PasteBanished
+        } else {
+            ResponseKey::LinkBanished
+        };
+        return Ok(get_response(req, banished));
     }
     if record.meta.kind == LinkKind::Paste {
         return transmute_paste(platform, config, req, &alias_hash, record).await;

@@ -516,7 +516,7 @@ mod managing {
         seed(&fake);
         let before = fake.meta("mine");
         let response = manage(&fake, &Config::default(), &transmute("new\ntext"));
-        assert!(body(&response).contains("the worm transmuted your link."));
+        assert!(body(&response).contains("the worm transmuted your paste."));
         assert_eq!(fake.link_value("mine").as_deref(), Some("new\ntext"));
         manage(&fake, &Config::default(), &transmute("crlf\r\ntext"));
         assert_eq!(fake.link_value("mine").as_deref(), Some("crlf\ntext"));

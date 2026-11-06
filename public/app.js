@@ -249,11 +249,17 @@ const ALIAS_LABELS = { free: '✅ free', taken: '❌ taken', invalid: '❌ not a
 let aliasTimer;
 let aliasRequest = 0;
 
-aliasInput?.addEventListener('input', () => {
+// Also cancels a check still on its way, whose answer would be about old text.
+function clearAliasStatus() {
   clearTimeout(aliasTimer);
-  const value = aliasInput.value.trim();
+  aliasRequest += 1;
   aliasStatus.textContent = '';
   delete aliasStatus.dataset.status;
+}
+
+aliasInput?.addEventListener('input', () => {
+  clearAliasStatus();
+  const value = aliasInput.value.trim();
   if (value === '') {
     return;
   }
@@ -344,7 +350,7 @@ document.querySelectorAll('form[data-orb]').forEach((form) => {
 
     // Read the fields before disabling buttons, or the clicked action gets lost.
     const body = new FormData(form, button);
-    const label = button?.textContent;
+    let label = button?.textContent;
     form.querySelectorAll('button').forEach((each) => { each.disabled = true; });
     if (button) {
       button.textContent = pick(LOADING_LINES);
@@ -368,8 +374,10 @@ document.querySelectorAll('form[data-orb]').forEach((form) => {
         }
         if (form.hasAttribute('data-reset')) {
           form.reset();
-          applyTab(summonTabs.find((tab) => tab.getAttribute('aria-selected') === 'true'));
-          aliasStatus.textContent = '';
+          const tab = summonTabs.find((each) => each.getAttribute('aria-selected') === 'true');
+          applyTab(tab);
+          label = tab.dataset.label;
+          clearAliasStatus();
           wormRain(8);
         }
         setMood('cheer');

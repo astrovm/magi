@@ -27,6 +27,8 @@ pub enum ResponseKey {
     NotHuman,
     LinkTransmuted,
     LinkBanished,
+    PasteTransmuted,
+    PasteBanished,
     ServerError,
     EmptyPaste,
     PasteTooBig,
@@ -96,6 +98,12 @@ impl ResponseKey {
                 Tone::Error,
             ),
             Self::LinkTransmuted => ("the worm transmuted your link.", 200, Tone::Success),
+            Self::PasteTransmuted => ("the worm transmuted your paste.", 200, Tone::Success),
+            Self::PasteBanished => (
+                "the worm banished your paste to the shadow realm.",
+                200,
+                Tone::Success,
+            ),
             Self::LinkBanished => (
                 "the worm banished your link to the shadow realm.",
                 200,
@@ -158,6 +166,12 @@ pub struct CreatedLink<'a> {
     pub view_url: Option<&'a str>,
 }
 
+fn without_scheme(url: &str) -> &str {
+    url.strip_prefix("https://")
+        .or_else(|| url.strip_prefix("http://"))
+        .unwrap_or(url)
+}
+
 fn link_created_html(link: &CreatedLink<'_>) -> String {
     let CreatedLink {
         short_url,
@@ -167,11 +181,7 @@ fn link_created_html(link: &CreatedLink<'_>) -> String {
         kind,
         view_url,
     } = link;
-    let label = short_url
-        .strip_prefix("https://")
-        .or_else(|| short_url.strip_prefix("http://"))
-        .unwrap_or(short_url);
-    let short_label = escape_html(label);
+    let short_label = escape_html(without_scheme(short_url));
     let safe_url = escape_html(short_url);
     let safe_alias = escape_html(alias);
     let safe_key = escape_html(manage_key);
@@ -196,8 +206,9 @@ fn link_created_html(link: &CreatedLink<'_>) -> String {
     );
     let view_row = view_url.map_or_else(String::new, |view_url| {
         let safe_view = escape_html(view_url);
+        let view_label = escape_html(without_scheme(view_url));
         let row = copy_row(
-            &format!(r#"<a class="short-link" href="{safe_view}">{safe_view}</a>"#),
+            &format!(r#"<a class="short-link" href="{safe_view}">{view_label}</a>"#),
             view_url,
         );
         format!(r#"<p class="hint">👀 view-only link</p>{row}"#)

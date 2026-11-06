@@ -79,6 +79,7 @@ mod creating {
         let view_url = between(html, "view-only link</p>", "</div>");
         let view_alias = between(view_url, "href=\"https://s.4st.li/", "\"");
         assert_eq!(view_alias.len(), 22);
+        assert!(view_url.contains(&format!(">s.4st.li/{view_alias}<")));
 
         let calls = fake.room_calls.borrow();
         let (room, path, sent) = &calls[0];
@@ -374,7 +375,7 @@ mod owner {
     fn banish_wipes_the_room_and_both_aliases() {
         let fake = Fake::new();
         seed(&fake);
-        assert!(body(&manage(&fake, "banish", &[])).contains("shadow realm"));
+        assert!(body(&manage(&fake, "banish", &[])).contains("banished your paste"));
         assert_eq!(room_paths(&fake), [ROOM_WIPE]);
         assert!(fake.kv.borrow().is_empty());
     }

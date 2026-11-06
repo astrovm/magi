@@ -28,5 +28,8 @@
     "test": "cargo llvm-cov -p magi-core --fail-under-lines 100 --fail-under-functions 100",
     "test:http": "scripts/test-http.sh",
     "build:live": "bun build client/live.js --outfile public/live.js --minify --target browser"
+  },
+  "overrides": {
+    "minimatch": "^11.0.1"
   }
 }

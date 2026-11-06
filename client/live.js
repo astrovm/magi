@@ -41,7 +41,7 @@ let connected = false;
 let gone = false;
 
 const editable = new Compartment();
-const readOnly = () => role === 'view' || locked || full;
+const readOnly = () => role === 'view' || locked || full || gone;
 const editableState = () => [
   EditorState.readOnly.of(readOnly()),
   EditorView.editable.of(!readOnly()),
@@ -91,6 +91,7 @@ function showStatus() {
 function applyAccess() {
   view.dispatch({ effects: editable.reconfigure(editableState()) });
   showStatus();
+  showOwnerTools();
 }
 
 provider.messageHandlers[NOTICE_MESSAGE] = (_encoder, decoder) => {
@@ -120,18 +121,35 @@ provider.awareness.on('change', showStatus);
 
 /* owner tools: only for whoever has the manage key in this browser */
 
-function savedKey() {
+function savedLinks() {
   try {
-    const links = JSON.parse(localStorage.getItem(MY_LINKS_KEY) ?? '[]');
-    const saved = links.find((link) => link.alias.toLowerCase() === alias.toLowerCase());
-    return saved?.key;
+    return JSON.parse(localStorage.getItem(MY_LINKS_KEY) ?? '[]');
   } catch {
-    return undefined;
+    return [];
+  }
+}
+
+const isThisPaste = (link) => link.alias.toLowerCase() === alias.toLowerCase();
+
+function forgetThisPaste() {
+  try {
+    localStorage.setItem(MY_LINKS_KEY, JSON.stringify(savedLinks().filter((link) => !isThisPaste(link))));
+  } catch {
+    // Only "my links" would still show it, and that link answers 404 now.
   }
 }
 
 const owner = document.getElementById('live-owner');
-const manageKey = role === 'edit' ? savedKey() : undefined;
+const manageKey = role === 'edit' ? savedLinks().find(isThisPaste)?.key : undefined;
+
+function showOwnerTools() {
+  if (!owner || !manageKey) {
+    return;
+  }
+  owner.hidden = gone;
+  owner.querySelector('[data-owner="lock"]').hidden = locked;
+  owner.querySelector('[data-owner="unlock"]').hidden = !locked;
+}
 
 async function manage(action, extra = {}) {
   const body = new FormData();
@@ -168,7 +186,7 @@ async function loadSnapshots() {
 }
 
 if (owner && manageKey) {
-  owner.hidden = false;
+  showOwnerTools();
   owner.addEventListener('toggle', () => {
     if (owner.open) {
       loadSnapshots();
@@ -182,6 +200,9 @@ if (owner && manageKey) {
       }
       const response = await manage(action);
       showOwnerResult(await response.text());
+      if (action === 'banish' && response.ok) {
+        forgetThisPaste();
+      }
     });
   });
 }

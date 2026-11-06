@@ -233,11 +233,16 @@ textarea:focus {
   margin-top: 4px;
 }
 
+/* Buttons and rows set their own display, which would otherwise beat this. */
+[hidden] {
+  display: none !important;
+}
+
 summary {
   cursor: pointer;
   font-weight: 600;
   color: var(--gold);
-  padding: 6px 0;
+  padding: 12px 0;
   list-style: none;
   user-select: none;
 }
@@ -269,10 +274,12 @@ details[open] > summary::after {
   gap: 6px;
 }
 
-.spell-grid .check {
+.check {
+  display: flex;
   flex-direction: row;
   align-items: center;
   gap: 10px;
+  min-height: 48px;
   cursor: pointer;
 }
 
