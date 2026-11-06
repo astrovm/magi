@@ -550,6 +550,19 @@ describe('POST /telegram', () => {
     expect(replies(fetch)).toEqual(["👀 watching Mine. i'll snitch on every visit. give me a few minutes to wake up.", '😴 stopped watching mine.']);
   });
 
+  test('keeps every fortune cookie destination when toggling alerts', async () => {
+    fetchSpy();
+    const env = botEnv();
+    const destinations = 'https://one.example\nhttps://two.example\nhttps://three.example';
+    storeLink(env, 'lucky', destinations, { key: sha256(KEY) });
+    await telegram({ env, request: update(`/alert lucky ${KEY}`) });
+    expect(env.links.store.get(md5('lucky'))).toBe(destinations);
+    expect(env.links.metadata.get(md5('lucky'))).toEqual({ key: sha256(KEY), tg: 99 });
+    await telegram({ env, request: update(`/alert lucky ${KEY}`) });
+    expect(env.links.store.get(md5('lucky'))).toBe(destinations);
+    expect(env.links.metadata.get(md5('lucky'))).toEqual({ key: sha256(KEY) });
+  });
+
   test('refuses bad alert requests', async () => {
     const fetch = fetchSpy();
     const env = botEnv();
