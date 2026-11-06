@@ -1,6 +1,7 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "magi",
+  "account_id": "862d327a982abfbbcd56c2ea3f4060d8",
   "main": "build/index.js",
   "compatibility_date": "2026-11-06",
   "build": {

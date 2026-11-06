@@ -18,6 +18,11 @@ export const newIp = (): string => {
   return `198.51.${(counter >> 8) & 255}.${counter & 255}`;
 };
 
+// Real Cloudflare refuses this header from outside (error 1000), so a deployed
+// site sees one visitor and its real rate limits.
+const visitor = (): Record<string, string> =>
+  new URL(BASE).hostname === '127.0.0.1' ? { 'CF-Connecting-IP': newIp() } : {};
+
 export const go = (path: string, init: RequestInit = {}): Promise<Response> =>
   fetch(`${BASE}${path}`, { redirect: 'manual', ...init });
 
@@ -28,7 +33,7 @@ export const post = (
 ): Promise<Response> => {
   const body = new FormData();
   Object.entries(fields).forEach(([key, value]) => body.append(key, value));
-  return go(path, { method: 'POST', body, headers: { 'CF-Connecting-IP': newIp(), ...headers } });
+  return go(path, { method: 'POST', body, headers: { ...visitor(), ...headers } });
 };
 
 export type Created = { alias: string; key: string; html: string; status: number };
