@@ -17,6 +17,15 @@ pub fn with_scheme(input: &str) -> String {
     }
 }
 
+/// The host and any non-default port, as in a URL's `host` property.
+pub fn host_with_port(url: &Url) -> String {
+    let host = url.host_str().unwrap_or_default();
+    match url.port() {
+        Some(port) => format!("{host}:{port}"),
+        None => host.to_owned(),
+    }
+}
+
 fn parse_web_url(text: &str) -> Option<Url> {
     // URL parsers quietly drop line breaks, but links are stored one per line.
     if text.chars().any(char::is_control) {
@@ -38,11 +47,7 @@ impl Target {
     pub fn from_input(input: &str) -> Option<Self> {
         let text = with_scheme(input);
         let url = parse_web_url(&text)?;
-        let host = match (url.host_str(), url.port()) {
-            (Some(host), Some(port)) => format!("{host}:{port}"),
-            (Some(host), None) => host.to_owned(),
-            (None, _) => return None,
-        };
+        let host = host_with_port(&url);
         Some(Self { text, host })
     }
 

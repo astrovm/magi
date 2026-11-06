@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 use crate::store::LinkMeta;
+use crate::target::host_with_port;
 use crate::visits::Background;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -196,11 +197,7 @@ impl Req {
     }
 
     pub fn host(&self) -> String {
-        match (self.url.host_str(), self.url.port()) {
-            (Some(host), Some(port)) => format!("{host}:{port}"),
-            (Some(host), None) => host.to_owned(),
-            (None, _) => String::new(),
-        }
+        host_with_port(&self.url)
     }
 
     pub fn origin(&self) -> String {

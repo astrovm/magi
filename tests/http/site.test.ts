@@ -1,8 +1,7 @@
 import { describe, expect, test } from 'bun:test';
-import { BASE, BOT_NAME, create, go, newIp, post, TARGET, telegram, uniqueAlias } from './helpers';
+import { BASE, BOT_NAME, create, go, newIp, post, telegram, uniqueAlias } from './helpers';
 
 const RICKROLL = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
-const rustOnly = test.skipIf(TARGET !== 'rust');
 
 const peekText = async (alias: string): Promise<string> => (await go(`/${alias}+`)).text();
 const destinations = (html: string): string[] =>
@@ -30,7 +29,7 @@ describe('static site', () => {
   });
 
   // The old site answered these with the homepage and a 200.
-  rustOnly('answers 404 for a dotted path that is no file', async () => {
+  test('answers 404 for a dotted path that is no file', async () => {
     expect((await go('/nope.css')).status).toBe(404);
   });
 });
@@ -152,7 +151,7 @@ describe('POST /orb', () => {
     expect(await response.text()).toContain('the orb rejected your request.');
   });
 
-  test.skipIf(TARGET !== 'rust').each([
+  test.each([
     ['a file as url', { url: new File(['x'], 'x.txt') }],
     ['a file as alias', { url: 'https://example.com', alias: new File(['x'], 'x.txt') }],
     ['a file as fortune', { url: 'https://example.com', fortune: new File(['x'], 'x.txt') }],
@@ -162,13 +161,13 @@ describe('POST /orb', () => {
     expect(await response.text()).toContain('the orb rejected your request.');
   });
 
-  rustOnly('rejects an alias that decodes to nothing', async () => {
+  test('rejects an alias that decodes to nothing', async () => {
     const { status, html } = await create({ alias: '%20' });
     expect(status).toBe(400);
     expect(html).toContain('the orb rejected your alias.');
   });
 
-  rustOnly('answers a body that is not a form with a clean error', async () => {
+  test('answers a body that is not a form with a clean error', async () => {
     const response = await go('/orb', {
       method: 'POST',
       body: '{"nope":1}',
@@ -213,7 +212,7 @@ describe('visiting a link', () => {
     expect((await go(`/${alias}`)).headers.get('Location')).toBe('https://Example.com:8080/x?y=1#z');
   });
 
-  rustOnly('redirects to destinations with non-ASCII characters', async () => {
+  test('redirects to destinations with non-ASCII characters', async () => {
     const { alias, status } = await create({ url: 'https://example.com/日本語?q=ñ' });
     expect(status).toBe(201);
     const response = await go(`/${alias}`);
@@ -453,7 +452,7 @@ describe('POST /telegram', () => {
     expect((await go('/telegram', { method: 'POST', body: '{}' })).status).toBe(404);
   });
 
-  rustOnly('toggles alerts and keeps every fortune cookie destination', async () => {
+  test('toggles alerts and keeps every fortune cookie destination', async () => {
     const { alias, key } = await create({ url: 'https://a.example', fortune: 'b.example\nc.example' });
     await telegram(`/alert ${alias} ${key}`);
     const watched = await peekText(alias);
@@ -465,7 +464,7 @@ describe('POST /telegram', () => {
     expect(destinations(quiet)).toEqual(['https://a.example', 'https://b.example', 'https://c.example']);
   });
 
-  rustOnly('answers 200 even when replying to Telegram fails, so it does not retry', async () => {
+  test('answers 200 even when replying to Telegram fails, so it does not retry', async () => {
     expect((await telegram('/start')).status).toBe(200);
   });
 
@@ -499,7 +498,7 @@ describe('routing', () => {
   });
 
   // The old site answered this with the homepage and a 200.
-  rustOnly('answers multi-segment paths with 404', async () => {
+  test('answers multi-segment paths with 404', async () => {
     expect((await go('/a/b')).status).toBe(404);
     expect((await go('/a/b', { method: 'POST' })).status).toBeGreaterThanOrEqual(400);
   });

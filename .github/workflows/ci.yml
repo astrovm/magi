@@ -12,24 +12,46 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  test:
+  rust:
     runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions-rust-lang/setup-rust-toolchain@a188e68d0fd2bd36ad51dccb2b07ba6e75105f30 # v2.0.1
+      - uses: taiki-e/install-action@3a3daafd3b7f23b8f65d9f5ba2db203fb59b79e2 # v2.90.2
+        with:
+          tool: cargo-llvm-cov
+      - run: cargo fmt --check
+      - run: cargo clippy --locked -p magi --target wasm32-unknown-unknown -- -D warnings
+      - run: cargo clippy --locked -p magi-core --all-targets -- -D warnings
+      - run: cargo llvm-cov --locked -p magi-core --fail-under-lines 100 --fail-under-functions 100
+
+  http:
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions-rust-lang/setup-rust-toolchain@a188e68d0fd2bd36ad51dccb2b07ba6e75105f30 # v2.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: lts/*
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version-file: package.json
       - run: bun install --frozen-lockfile
+      - name: Install the worker-build that matches the worker crate
+        run: |
+          version="$(cargo metadata --locked --format-version 1 | jq -r '.packages[] | select(.name == "worker") | .version')"
+          cargo install worker-build --locked --version "$version"
       - run: bun run lint
       - run: bun run tsc
-      - run: bun run test
+      - run: bun run test:http
 
   required-ci:
     name: CI / Required
     # Always report a result, including when a prerequisite failed or was skipped.
     if: ${{ always() && github.event_name == 'pull_request' }}
     needs:
-      - test
+      - rust
+      - http
     runs-on: ubuntu-26.04
     timeout-minutes: 5
     permissions: {}

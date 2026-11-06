@@ -45,7 +45,11 @@ impl ResponseKey {
             ),
             Self::OwnTail => ("the orb refuses to eat its own tail.", 400, Tone::Error),
             Self::WrongKey => (ORB_WRONG_KEY_MESSAGE, 403, Tone::Error),
-            Self::BadSpell => ("the orb rejected your weird spell settings.", 400, Tone::Error),
+            Self::BadSpell => (
+                "the orb rejected your weird spell settings.",
+                400,
+                Tone::Error,
+            ),
             Self::NoAliasLeft => (
                 "the worm ran out of ideas. try a custom alias.",
                 503,
@@ -150,7 +154,10 @@ fn link_created_html(link: &CreatedLink<'_>) -> String {
         &format!(r#"<a class="short-link" href="{safe_url}">{short_label}</a>"#),
         short_url,
     );
-    let key_row = copy_row(&format!(r#"<code class="secret">{safe_key}</code>"#), manage_key);
+    let key_row = copy_row(
+        &format!(r#"<code class="secret">{safe_key}</code>"#),
+        manage_key,
+    );
     let qr = render_svg(short_url);
 
     // The page script reads these to save the link under "my links".

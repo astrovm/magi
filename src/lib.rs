@@ -31,17 +31,14 @@ struct Cloudflare {
 }
 
 fn web_crypto() -> CoreResult<web_sys::Crypto> {
-    let crypto = Reflect::get(&js_sys::global(), &JsValue::from_str("crypto")).map_err(platform_error)?;
+    let crypto =
+        Reflect::get(&js_sys::global(), &JsValue::from_str("crypto")).map_err(platform_error)?;
     crypto.dyn_into().map_err(platform_error)
 }
 
 impl Platform for Cloudflare {
     async fn kv_get(&self, key: &str) -> CoreResult<Option<String>> {
-        self.links
-            .get(key)
-            .text()
-            .await
-            .map_err(platform_error)
+        self.links.get(key).text().await.map_err(platform_error)
     }
 
     async fn kv_get_with_metadata(
@@ -77,15 +74,25 @@ impl Platform for Cloudflare {
         self.links.delete(key).await.map_err(platform_error)
     }
 
-    async fn http_post(&self, url: &str, content_type: &str, body: String) -> CoreResult<HttpReply> {
+    async fn http_post(
+        &self,
+        url: &str,
+        content_type: &str,
+        body: String,
+    ) -> CoreResult<HttpReply> {
         let headers = Headers::new();
-        headers.set("Content-Type", content_type).map_err(platform_error)?;
+        headers
+            .set("Content-Type", content_type)
+            .map_err(platform_error)?;
         let mut init = RequestInit::new();
         init.with_method(Method::Post)
             .with_headers(headers)
             .with_body(Some(JsValue::from_str(&body)));
         let request = Request::new_with_init(url, &init).map_err(platform_error)?;
-        let mut response = Fetch::Request(request).send().await.map_err(platform_error)?;
+        let mut response = Fetch::Request(request)
+            .send()
+            .await
+            .map_err(platform_error)?;
         Ok(HttpReply {
             status: response.status_code(),
             body: response.text().await.map_err(platform_error)?,
@@ -101,7 +108,8 @@ impl Platform for Cloudflare {
             .map_err(platform_error)?;
         let key = JsFuture::from(imported).await.map_err(platform_error)?;
         let salt: Object = Uint8Array::from(salt).into();
-        let params = web_sys::Pbkdf2Params::new("PBKDF2", &JsValue::from_str("SHA-256"), iterations, &salt);
+        let params =
+            web_sys::Pbkdf2Params::new("PBKDF2", &JsValue::from_str("SHA-256"), iterations, &salt);
         let derived = subtle
             .derive_bits_with_object(&params, &key.unchecked_into(), 256)
             .map_err(platform_error)?;
@@ -210,12 +218,17 @@ fn to_response(res: Res) -> Result<Response> {
 #[event(fetch)]
 async fn fetch(mut request: Request, env: Env, context: Context) -> Result<Response> {
     let config = read_config(&env);
-    let platform = Cloudflare { links: env.kv("links")? };
+    let platform = Cloudflare {
+        links: env.kv("links")?,
+    };
     let req = read_request(&mut request).await?;
 
     match handle(&platform, &config, &req).await {
         Ok(Outcome::Asset) => env.assets("ASSETS")?.fetch_request(request).await,
-        Ok(Outcome::Reply { response, background }) => {
+        Ok(Outcome::Reply {
+            response,
+            background,
+        }) => {
             if let Some(job) = background {
                 context.wait_until(async move {
                     if let Err(error) = run_background(&platform, &config, &job).await {

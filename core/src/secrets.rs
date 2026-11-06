@@ -22,7 +22,9 @@ pub fn sha256_hex(text: &str) -> String {
 
 pub async fn hash_password<P: Platform>(platform: &P, password: &str) -> Result<String> {
     let salt = platform.random_bytes(SALT_BYTES)?;
-    let hash = platform.pbkdf2(password, &salt, PASSWORD_ITERATIONS).await?;
+    let hash = platform
+        .pbkdf2(password, &salt, PASSWORD_ITERATIONS)
+        .await?;
     Ok(format!(
         "{}.{}",
         URL_SAFE_NO_PAD.encode(salt),
@@ -55,6 +57,8 @@ pub async fn verify_password<P: Platform>(
     let Ok(salt) = URL_SAFE_NO_PAD.decode(salt) else {
         return Ok(false);
     };
-    let hash = platform.pbkdf2(password, &salt, PASSWORD_ITERATIONS).await?;
+    let hash = platform
+        .pbkdf2(password, &salt, PASSWORD_ITERATIONS)
+        .await?;
     Ok(timing_safe_equal(&URL_SAFE_NO_PAD.encode(hash), expected))
 }

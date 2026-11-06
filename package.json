@@ -2,7 +2,6 @@
   "name": "magi",
   "author": "4st.li",
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20261008.1",
     "@eslint/js": "^10.0.1",
     "@types/bun": "^1.4.2",
     "@typescript-eslint/eslint-plugin": "^8.71.1",
@@ -16,10 +15,11 @@
   "license": "MIT",
   "packageManager": "bun@1.4.4",
   "scripts": {
-    "start": "bunx wrangler pages dev ./public --kv links",
+    "start": "wrangler dev --port 8788",
     "lint": "bunx eslint .",
     "lint-fix": "bunx eslint . --fix",
     "tsc": "bunx tsc --noEmit",
-    "test": "bun test --coverage"
+    "test": "cargo llvm-cov -p magi-core --fail-under-lines 100 --fail-under-functions 100",
+    "test:http": "scripts/test-http.sh"
   }
 }

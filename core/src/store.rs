@@ -61,7 +61,9 @@ pub fn clicks_key(alias_hash: &str) -> String {
 }
 
 pub async fn get_link<P: Platform>(platform: &P, alias_hash: &str) -> Result<Option<LinkRecord>> {
-    let Some((value, meta)) = platform.kv_get_with_metadata(alias_hash, LINK_CACHE_TTL).await?
+    let Some((value, meta)) = platform
+        .kv_get_with_metadata(alias_hash, LINK_CACHE_TTL)
+        .await?
     else {
         return Ok(None);
     };
@@ -87,7 +89,9 @@ pub async fn put_link<P: Platform>(
         expiration_ttl: None,
         metadata: Some(record.meta.clone()),
     };
-    platform.kv_put(alias_hash, &lines.join("\n"), options).await
+    platform
+        .kv_put(alias_hash, &lines.join("\n"), options)
+        .await
 }
 
 pub async fn delete_link<P: Platform>(platform: &P, alias_hash: &str) -> Result<()> {
@@ -103,7 +107,11 @@ pub async fn get_clicks<P: Platform>(platform: &P, alias_hash: &str) -> Result<u
 
 /// Bumps the visit counter. KV has no atomic increment, so concurrent visits
 /// can be undercounted. The orb is bad at math and has made peace with it.
-pub async fn add_click<P: Platform>(platform: &P, alias_hash: &str, meta: &LinkMeta) -> Result<u64> {
+pub async fn add_click<P: Platform>(
+    platform: &P,
+    alias_hash: &str,
+    meta: &LinkMeta,
+) -> Result<u64> {
     let clicks = get_clicks(platform, alias_hash).await?.saturating_add(1);
     let options = PutOptions {
         expiration: meta.exp,

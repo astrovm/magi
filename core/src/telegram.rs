@@ -96,10 +96,15 @@ pub fn parse_command(update: &Value) -> Option<TelegramCommand> {
     let message = update.get("message")?;
     let text = message.get("text")?.as_str()?;
     let chat_id = message.get("chat")?.get("id")?.as_i64()?;
-    let mut words = text.split(crate::text::is_js_space).filter(|word| !word.is_empty());
+    let mut words = text
+        .split(crate::text::is_js_space)
+        .filter(|word| !word.is_empty());
     let raw = words.next().unwrap_or_default();
     let without_bot = raw.split('@').next().unwrap_or_default();
-    let command = without_bot.strip_prefix('/').unwrap_or(without_bot).to_lowercase();
+    let command = without_bot
+        .strip_prefix('/')
+        .unwrap_or(without_bot)
+        .to_lowercase();
     Some(TelegramCommand {
         chat_id,
         command,

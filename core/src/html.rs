@@ -11,9 +11,10 @@ pub struct PageOptions<'a> {
 }
 
 pub fn render_page(body: &str, options: PageOptions<'_>) -> Res {
-    let title = options
-        .title
-        .map_or_else(|| "Magi".to_owned(), |title| format!("{} | Magi", escape_html(title)));
+    let title = options.title.map_or_else(
+        || "Magi".to_owned(),
+        |title| format!("{} | Magi", escape_html(title)),
+    );
     let html = format!(
         r#"<!DOCTYPE html>
 <html lang="en">

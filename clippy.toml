@@ -1,0 +1,5 @@
+# A failed assertion or a broken fixture should panic in tests. Only the server has to survive.
+allow-expect-in-tests = true
+allow-indexing-slicing-in-tests = true
+allow-panic-in-tests = true
+allow-unwrap-in-tests = true

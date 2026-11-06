@@ -72,7 +72,11 @@ fn fact(label: &str, value: &str) -> String {
 
 /// A fact that only shows up when its spell is on.
 fn fact_if(on: bool, label: &str, value: &str) -> String {
-    if on { fact(label, value) } else { String::new() }
+    if on {
+        fact(label, value)
+    } else {
+        String::new()
+    }
 }
 
 pub struct PreviewDetails<'a> {
@@ -90,7 +94,9 @@ fn destination_fact(record: &LinkRecord) -> String {
         .chain(&record.more)
         .map(|url| {
             let safe = escape_html(url);
-            format!(r#"<a href="{safe}" rel="noopener noreferrer nofollow" class="long-url">{safe}</a>"#)
+            format!(
+                r#"<a href="{safe}" rel="noopener noreferrer nofollow" class="long-url">{safe}</a>"#
+            )
         })
         .collect();
     let label = if record.more.is_empty() {
@@ -115,7 +121,11 @@ pub fn preview_page(details: &PreviewDetails<'_>) -> Res {
         destination_fact(record),
         meta.created
             .map_or_else(String::new, |created| fact("born", &format_date(created))),
-        fact_if(meta.count || meta.max.is_some(), "visits", &clicks.to_string()),
+        fact_if(
+            meta.count || meta.max.is_some(),
+            "visits",
+            &clicks.to_string(),
+        ),
         meta.max.map_or_else(String::new, |max| {
             let left = max.saturating_sub(*clicks);
             fact("self-destructs", &format!("after {left} more visits"))
@@ -124,7 +134,11 @@ pub fn preview_page(details: &PreviewDetails<'_>) -> Res {
             fact("expires", &format_date_time(exp.saturating_mul(1000)))
         }),
         fact_if(meta.cursed, "curse", "☠️ might rickroll you"),
-        fact_if(meta.tg.is_some(), "snitch", "📡 the owner gets visit alerts"),
+        fact_if(
+            meta.tg.is_some(),
+            "snitch",
+            "📡 the owner gets visit alerts",
+        ),
         fact_if(
             meta.wait,
             "countdown",

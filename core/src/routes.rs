@@ -7,9 +7,14 @@ use crate::guards::{
     CREATE_LIMIT, UNLOCK_LIMIT, count_attempt, is_dangerous, is_limited, limit_key,
     passes_turnstile,
 };
-use crate::pages::{PreviewDetails, UnlockState, countdown_page, not_found_page, preview_page, unlock_page};
+use crate::pages::{
+    PreviewDetails, UnlockState, countdown_page, not_found_page, preview_page, unlock_page,
+};
 use crate::platform::{Body, Config, Form, Method, Outcome, Platform, Req, Res, Result};
-use crate::responses::{CreatedLink, ORB_LINK_NOT_FOUND_MESSAGE, ORB_WRONG_KEY_MESSAGE, ResponseKey, get_response, link_created};
+use crate::responses::{
+    CreatedLink, ORB_LINK_NOT_FOUND_MESSAGE, ORB_WRONG_KEY_MESSAGE, ResponseKey, get_response,
+    link_created,
+};
 use crate::secrets::{hash_password, random_token, sha256_hex, timing_safe_equal, verify_password};
 use crate::spells::{parse_fortunes, parse_spells, parse_target};
 use crate::store::{LinkMeta, LinkRecord, delete_link, get_clicks, get_link, put_link};
@@ -76,11 +81,13 @@ async fn orb_get<P: Platform>(platform: &P, config: &Config, req: &Req) -> Resul
     if js_trim(&alias).is_empty() {
         return Ok(json_reply(&json!({ "status": "invalid" })));
     }
-    Ok(json_reply(&match claim_custom_alias(platform, &alias).await? {
-        Ok(claimed) => json!({ "status": "free", "alias": claimed.alias }),
-        Err(ResponseKey::AliasLocked) => json!({ "status": "taken" }),
-        Err(_) => json!({ "status": "invalid" }),
-    }))
+    Ok(json_reply(
+        &match claim_custom_alias(platform, &alias).await? {
+            Ok(claimed) => json!({ "status": "free", "alias": claimed.alias }),
+            Err(ResponseKey::AliasLocked) => json!({ "status": "taken" }),
+            Err(_) => json!({ "status": "invalid" }),
+        },
+    ))
 }
 
 async fn orb_post<P: Platform>(platform: &P, config: &Config, req: &Req) -> Result<Res> {
@@ -119,7 +126,13 @@ async fn orb_post<P: Platform>(platform: &P, config: &Config, req: &Req) -> Resu
     };
     let mut destinations = vec![target.as_str()];
     destinations.extend(fortunes.iter().map(String::as_str));
-    if is_dangerous(platform, config.safe_browsing_api_key.as_deref(), &destinations).await {
+    if is_dangerous(
+        platform,
+        config.safe_browsing_api_key.as_deref(),
+        &destinations,
+    )
+    .await
+    {
         return Ok(get_response(req, ResponseKey::DangerUrl));
     }
 
@@ -205,7 +218,13 @@ async fn manage_post<P: Platform>(platform: &P, config: &Config, req: &Req) -> R
         Ok(target) => target,
         Err(key) => return Ok(get_response(req, key)),
     };
-    if is_dangerous(platform, config.safe_browsing_api_key.as_deref(), &[target.as_str()]).await {
+    if is_dangerous(
+        platform,
+        config.safe_browsing_api_key.as_deref(),
+        &[target.as_str()],
+    )
+    .await
+    {
         return Ok(get_response(req, ResponseKey::DangerUrl));
     }
 
@@ -246,10 +265,8 @@ async fn toggle_alerts<P: Platform>(platform: &P, command: &TelegramCommand) -> 
 }
 
 async fn telegram_post<P: Platform>(platform: &P, config: &Config, req: &Req) -> Result<Res> {
-    let (Some(token), Some(secret)) = (
-        &config.telegram_bot_token,
-        &config.telegram_webhook_secret,
-    ) else {
+    let (Some(token), Some(secret)) = (&config.telegram_bot_token, &config.telegram_webhook_secret)
+    else {
         return Ok(Res::new(404));
     };
     if !timing_safe_equal(&req.telegram_secret, secret) {

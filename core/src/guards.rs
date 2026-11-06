@@ -14,10 +14,16 @@ pub struct Limit {
 }
 
 /// Wrong passwords allowed per link and visitor before a lockout.
-pub const UNLOCK_LIMIT: Limit = Limit { max: 5, window: 900 };
+pub const UNLOCK_LIMIT: Limit = Limit {
+    max: 5,
+    window: 900,
+};
 
 /// Links one visitor can create per hour.
-pub const CREATE_LIMIT: Limit = Limit { max: 30, window: 3600 };
+pub const CREATE_LIMIT: Limit = Limit {
+    max: 30,
+    window: 3600,
+};
 
 pub const TURNSTILE_VERIFY_URL: &str = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 pub const SAFE_BROWSING_URL: &str = "https://safebrowsing.googleapis.com/v4/threatMatches:find";
@@ -67,7 +73,11 @@ pub async fn passes_turnstile<P: Platform>(
         .append_pair("remoteip", req.visitor_ip.as_deref().unwrap_or_default())
         .finish();
     let Ok(reply) = platform
-        .http_post(TURNSTILE_VERIFY_URL, "application/x-www-form-urlencoded", body)
+        .http_post(
+            TURNSTILE_VERIFY_URL,
+            "application/x-www-form-urlencoded",
+            body,
+        )
         .await
     else {
         return false;
@@ -78,11 +88,7 @@ pub async fn passes_turnstile<P: Platform>(
 
 /// Asks Google Safe Browsing about some destinations in one call. Without a
 /// key the check is off. Fails open: if Google is down, links still get created.
-pub async fn is_dangerous<P: Platform>(
-    platform: &P,
-    api_key: Option<&str>,
-    urls: &[&str],
-) -> bool {
+pub async fn is_dangerous<P: Platform>(platform: &P, api_key: Option<&str>, urls: &[&str]) -> bool {
     let Some(api_key) = api_key else {
         return false;
     };

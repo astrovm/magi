@@ -3,9 +3,6 @@ export const BASE = process.env.BASE_URL ?? 'http://127.0.0.1:8811';
 export const TELEGRAM_SECRET = process.env.TELEGRAM_SECRET ?? 'webhook-secret';
 export const BOT_NAME = 'MagiOrbBot';
 
-/** Set to `ts` when pointing the suite at the old TypeScript site. */
-export const TARGET = process.env.TARGET ?? 'rust';
-
 let counter = 0;
 const runId = Date.now().toString(36);
 
