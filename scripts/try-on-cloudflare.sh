@@ -22,14 +22,23 @@ if ! "$WRANGLER" whoami >"$LOG" 2>&1; then
   exit 1
 fi
 
+# Wrangler sometimes fails once with "No API token found", then works.
+keep_trying() {
+  for _ in 1 2 3; do
+    "$@" >"$LOG" 2>&1 </dev/null && return 0
+    sleep 5
+  done
+  cat "$LOG" >&2
+  return 1
+}
+
 cleanup() {
-  if [ -n "${DEPLOYED:-}" ] && ! "$WRANGLER" delete --config "$CONFIG" --force >"$LOG" 2>&1; then
-    cat "$LOG" >&2
-    echo "couldn't delete the $NAME Worker" >&2
+  if [ -n "${DEPLOYED:-}" ]; then
+    keep_trying "$WRANGLER" delete --config "$CONFIG" --force || echo "couldn't delete the $NAME Worker" >&2
   fi
-  if [ -n "${NAMESPACE:-}" ] && ! "$WRANGLER" kv namespace delete --namespace-id "$NAMESPACE" >"$LOG" 2>&1 </dev/null; then
-    cat "$LOG" >&2
-    echo "couldn't delete KV namespace $NAMESPACE" >&2
+  if [ -n "${NAMESPACE:-}" ]; then
+    keep_trying "$WRANGLER" kv namespace delete --namespace-id "$NAMESPACE" ||
+      echo "couldn't delete KV namespace $NAMESPACE" >&2
   fi
   rm -f "$CONFIG" "$LOG"
 }
@@ -42,8 +51,18 @@ if ! "$WRANGLER" kv namespace create "$NAME" >"$LOG" 2>&1 </dev/null; then
   exit 1
 fi
 NAMESPACE="$(grep -oE '"id": "[0-9a-f]{32}"' "$LOG" | grep -oE '[0-9a-f]{32}')"
+if [ -z "$NAMESPACE" ]; then
+  cat "$LOG" >&2
+  echo "couldn't read the new namespace's id" >&2
+  exit 1
+fi
 
-sed -e "s/\"name\": \"magi\"/\"name\": \"$NAME\"/" -e "s/\"id\": \"links\"/\"id\": \"$NAMESPACE\"/" wrangler.jsonc >"$CONFIG"
+sed -e "s/\"name\": \"magi\"/\"name\": \"$NAME\"/" -e "s/\"id\": \"[0-9a-f]*\"/\"id\": \"$NAMESPACE\"/" wrangler.jsonc >"$CONFIG"
+# This Worker gets deleted and its data thrown away, so it must never be the real one.
+if ! grep -q "\"name\": \"$NAME\"" "$CONFIG" || [ "$(grep -c '"id": "' "$CONFIG")" != 1 ] || ! grep -q "\"id\": \"$NAMESPACE\"" "$CONFIG"; then
+  echo "$CONFIG doesn't point at the throwaway Worker and namespace" >&2
+  exit 1
+fi
 DEPLOYED=1
 if ! "$WRANGLER" deploy --config "$CONFIG" >"$LOG" 2>&1 </dev/null; then
   cat "$LOG" >&2
