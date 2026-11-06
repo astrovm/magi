@@ -115,3 +115,4 @@ build/
 
 # Built from client/ by `bun run build:live`
 public/live.js
+wrangler.try.jsonc

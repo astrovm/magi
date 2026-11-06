@@ -5,6 +5,7 @@ use magi_core::live::{
     Reply, Role, Room, SNAPSHOT_EVERY_MS, awareness_query, expires_at, notice, snapshot_due,
 };
 use magi_core::live_frames::{SyncFrame, is_acceptable_update, parse_sync_frame};
+use std::cell::Cell;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 use yrs::sync::{Message, SyncMessage};
@@ -878,4 +879,106 @@ fn a_frame_built_to_keep_the_check_busy_stays_cheap() {
     // This took 13 s in release mode before the check stopped going round in
     // passes, so 5 s in any build leaves room for a slow machine.
     assert!(started.elapsed() < Duration::from_secs(5));
+}
+
+/// Random blocks that lean on each other, and the slow, obvious way to tell if
+/// they all fit: keep going round until nothing moves.
+#[test]
+fn agrees_with_going_round_until_nothing_moves() {
+    const WITH_ORIGIN: u8 = 4 | 0x80;
+    let seed = Cell::new(0x9E37_79B9_7F4A_7C15_u64);
+    let next = |below: u64| {
+        let mut value = seed.get();
+        value ^= value << 13;
+        value ^= value >> 7;
+        value ^= value << 17;
+        seed.set(value);
+        value % below
+    };
+    let (mut accepted, mut refused) = (0, 0);
+    for _ in 0..20_000 {
+        let known: HashMap<u64, u64> = (1..=4)
+            .filter(|_| next(3) == 0)
+            .map(|client| (client, 1 + next(3)))
+            .collect();
+        let mut sections = Vec::new();
+        for client in (1..=4).filter(|_| next(4) != 0) {
+            let at_start = known.get(&client).copied().unwrap_or(0);
+            let start = if next(16) == 0 {
+                at_start + 1
+            } else {
+                at_start
+            };
+            let origins: Vec<Option<(u64, u64)>> = (0..1 + next(4))
+                .map(|_| (next(2) == 0).then(|| (1 + next(4), next(2))))
+                .collect();
+            sections.push((client, start, origins));
+        }
+
+        let mut wire = Wire::default();
+        wire.number(sections.len() as u64);
+        for (client, start, origins) in &sections {
+            wire.number(origins.len() as u64)
+                .number(*client)
+                .number(*start);
+            for origin in origins {
+                match origin {
+                    Some((client, clock)) => {
+                        wire.byte(WITH_ORIGIN).number(*client).number(*clock);
+                    }
+                    None => {
+                        wire.byte(4).number(1).text("codemirror");
+                    }
+                }
+                wire.text("x");
+            }
+        }
+        wire.number(0);
+        let frame = wire.sent();
+        let Some(SyncFrame::Update(update)) = parse_sync_frame(&frame) else {
+            panic!("expected an update");
+        };
+
+        let mut reached = known.clone();
+        let mut done = vec![0; sections.len()];
+        loop {
+            let mut moved = false;
+            for (index, (client, start, origins)) in sections.iter().enumerate() {
+                while let Some(origin) = origins.get(done[index]) {
+                    let clock = start + done[index] as u64;
+                    let here = reached.get(client).copied().unwrap_or(0);
+                    let origin_known =
+                        origin.is_none_or(|(of, at)| at < reached.get(&of).copied().unwrap_or(0));
+                    if clock > here || !origin_known {
+                        break;
+                    }
+                    reached.insert(*client, here.max(clock + 1));
+                    done[index] += 1;
+                    moved = true;
+                }
+            }
+            if !moved {
+                break;
+            }
+        }
+        let fits = sections
+            .iter()
+            .zip(&done)
+            .all(|((_, _, origins), done)| origins.len() == *done);
+
+        assert_eq!(
+            is_acceptable_update(update, "codemirror", &known),
+            fits,
+            "{sections:?} with {known:?}"
+        );
+        if fits {
+            accepted += 1;
+        } else {
+            refused += 1;
+        }
+    }
+    assert!(
+        accepted > 1_000 && refused > 1_000,
+        "{accepted} / {refused}"
+    );
 }
