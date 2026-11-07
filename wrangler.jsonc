@@ -1,0 +1,27 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "magi",
+  "main": "build/index.js",
+  "compatibility_date": "2026-11-06",
+  "build": {
+    "command": "worker-build --release",
+    "watch_dir": ["src", "core/src"]
+  },
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    // Aliases can look like anything, so the worker answers first. Only paths
+    // that are surely files skip it, which saves a Worker request each.
+    "run_worker_first": ["/*", "!/fonts/*", "!/*.css", "!/*.js", "!/*.webp", "!/*.png", "!/*.jpg", "!/*.ico"]
+  },
+  "kv_namespaces": [
+    {
+      "binding": "links",
+      "id": "links"
+    }
+  ],
+  "observability": {
+    "enabled": true,
+    "traces": { "enabled": true }
+  }
+}

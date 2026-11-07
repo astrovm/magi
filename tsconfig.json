@@ -1,16 +1,19 @@
 {
     "compilerOptions": {
-        "target": "ES2020",
-        "module": "CommonJS",
+        "target": "ES2022",
+        "module": "ESNext",
+        "moduleResolution": "bundler",
         "lib": [
-            "ES2020"
+            "ES2022",
+            "DOM"
         ],
         "types": [
-            "@cloudflare/workers-types"
-        ]
+            "bun"
+        ],
+        "strict": true,
+        "noEmit": true
     },
     "include": [
-        "functions/**/*.ts",
-        "modules/**/*.ts"
+        "tests/**/*.ts"
     ]
 }

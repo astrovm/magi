@@ -34,10 +34,18 @@ Visit counts and self-destructs are approximate: Workers KV has no atomic counte
 
 ## 🛠️ Development
 
+The server is a Rust Cloudflare Worker: `core/` has the logic, `src/` connects it to Cloudflare, and `public/` has the static site.
+The toolchain comes from `rust-toolchain.toml`. You also need Bun, Node and `cargo install worker-build cargo-llvm-cov`.
+
 ```sh
 bun install
-bun run start   # http://localhost:8788
-bun run lint && bun run tsc && bun run test
+bun run start      # http://localhost:8788
+bun run test       # logic tests, needs 100% coverage
+bun run test:http  # builds the Worker and tests it over HTTP
+cargo fmt --check
+cargo clippy -p magi --target wasm32-unknown-unknown -- -D warnings
+cargo clippy -p magi-core --all-targets -- -D warnings
+bun run lint && bun run tsc
 ```
 
 ## 📡 Telegram alerts
@@ -45,7 +53,7 @@ bun run lint && bun run tsc && bun run test
 Optional. Without these variables the bot stays off and the site works the same.
 
 1. Create a bot with [@BotFather](https://t.me/BotFather).
-2. In the Pages project, set:
+2. In the Worker, set:
    - `TELEGRAM_BOT_TOKEN`: the bot token (secret).
    - `TELEGRAM_WEBHOOK_SECRET`: any random string (secret).
    - `TELEGRAM_BOT_USERNAME`: the bot username, without `@`.
