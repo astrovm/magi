@@ -50,6 +50,13 @@ cargo clippy -p magi-core --all-targets -- -D warnings
 bun run lint && bun run tsc
 ```
 
+### Deploying
+
+Every merge to `master` deploys itself through Workers Builds, which runs `scripts/cloudflare-build.sh` and then `wrangler deploy`.
+`s.4st.li`, `magi.4st.li` and `r.4st.li` reach the Worker through routes set on Cloudflare, not in `wrangler.jsonc`.
+
+`scripts/try-on-cloudflare.sh` tries a branch on real Cloudflare, on a throwaway Worker and KV namespace that it deletes afterwards.
+
 ## 📡 Telegram alerts
 
 Optional. Without these variables the bot stays off and the site works the same.
