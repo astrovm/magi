@@ -1209,7 +1209,7 @@ mod pages_and_responses {
         assert_eq!(req.form(), None);
         req.body = Body::Unreadable;
         assert_eq!(req.form(), None);
-        assert_eq!(req.origin(), "https://s.4st.li");
+        assert_eq!(req.origin(), "https://magi.4st.li");
     }
 
     #[test]

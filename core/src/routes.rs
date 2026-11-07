@@ -758,6 +758,14 @@ async fn alias_get<P: Platform>(platform: &P, req: &Req, raw: &str) -> Result<Ou
         })
         .into());
     }
+    // The owner's key is saved at home, whatever address the link says. Before
+    // the password, so nobody has to type it twice.
+    if matches!(record.meta.kind, LinkKind::Live | LinkKind::View)
+        && req.query("raw").is_none()
+        && let Some(home) = req.url_at_home()
+    {
+        return Ok(redirect_to(&home, false).into());
+    }
     if record.meta.pw.is_some() {
         return Ok(unlock_page(&lookup.alias, UnlockState::Ask, req.query("raw").is_some()).into());
     }

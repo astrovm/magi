@@ -54,8 +54,8 @@ bun run lint && bun run tsc
 
 Every merge to `master` deploys itself from GitHub Actions, once the tests pass on the merged code. It needs the `CLOUDFLARE_API_TOKEN` repo secret.
 `s.4st.li`, `magi.4st.li` and `r.4st.li` reach the Worker through routes set on Cloudflare, not in `wrangler.jsonc`.
-New links always say `s.4st.li`, and links shared with the other two keep working.
-The homepage on the other two moves to `s.4st.li` and brings **my links** along, because a browser keeps those per address.
+New links always say `s.4st.li`, and links shared with `magi.4st.li` or `r.4st.li` keep working.
+The site lives on `magi.4st.li`, because a browser keeps **my links** and manage keys per address. The homepage on the other two moves there and brings them along, and live pages open there too.
 
 `scripts/try-on-cloudflare.sh` tries a branch on real Cloudflare, on a throwaway Worker and KV namespace that it deletes afterwards.
 

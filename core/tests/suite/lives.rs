@@ -192,7 +192,7 @@ mod visiting {
         let policy = response
             .header("Content-Security-Policy")
             .expect("a policy");
-        assert!(policy.contains("connect-src 'self' ws://s.4st.li wss://s.4st.li"));
+        assert!(policy.contains("connect-src 'self' ws://magi.4st.li wss://magi.4st.li"));
         assert!(policy.contains("script-src 'self';"));
     }
 
@@ -331,7 +331,7 @@ mod sockets {
         assert_eq!(answer(&fake, &foreign).status, 403);
 
         let mut own = socket("/paste/ws/room");
-        own.origin_header = Some("https://s.4st.li".to_owned());
+        own.origin_header = Some("https://magi.4st.li".to_owned());
         assert!(matches!(
             run(&fake, &Config::default(), &own),
             Outcome::LiveSocket { .. }

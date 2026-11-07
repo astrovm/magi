@@ -12,7 +12,7 @@ use md5::{Digest, Md5};
 use sha2::Sha256;
 use url::Url;
 
-pub const HOST: &str = "https://s.4st.li";
+pub const HOST: &str = "https://magi.4st.li";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HttpCall {

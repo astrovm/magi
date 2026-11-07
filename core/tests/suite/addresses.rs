@@ -1,14 +1,14 @@
 //! The site answers on several addresses, but only hands out the short one.
 
-use magi_core::platform::{Config, Outcome, Req};
+use magi_core::platform::{Config, HttpReply, Outcome, Req};
 use magi_core::store::{LinkKind, LinkMeta};
 use magi_core::visits::Background;
 use url::Url;
 
 use crate::support::{Fake, HOST, answer, body, get, md5_hex, parts, post, run, sha256_hex};
 
-const OLD_ADDRESSES: [&str; 2] = ["https://magi.4st.li", "https://r.4st.li"];
-const EVERY_ADDRESS: [&str; 3] = [HOST, "https://magi.4st.li", "https://r.4st.li"];
+const OTHER_ADDRESSES: [&str; 2] = ["https://s.4st.li", "https://r.4st.li"];
+const EVERY_ADDRESS: [&str; 3] = [HOST, "https://s.4st.li", "https://r.4st.li"];
 const PREVIEW: &str = "https://magi-try.example.workers.dev";
 const VIEW: &str = "CTpOm7FFiy7ol1qbAAFvcw";
 
@@ -28,8 +28,9 @@ fn seed_room(fake: &Fake) {
             ..LinkMeta::default()
         }),
     );
+    // Aliases are looked up in lowercase.
     fake.store(
-        VIEW,
+        &VIEW.to_lowercase(),
         &md5_hex("room"),
         Some(LinkMeta {
             kind: LinkKind::View,
@@ -58,7 +59,7 @@ fn links_use_the_short_address_wherever_they_are_made() {
 
 #[test]
 fn pastes_use_the_short_address_wherever_they_are_made() {
-    for site in OLD_ADDRESSES {
+    for site in OTHER_ADDRESSES {
         let fake = Fake::new();
         let req = post("/paste", &[("alias", "note"), ("text", "hi")]);
         let response = answer(&fake, &at(site, req));
@@ -71,7 +72,7 @@ fn pastes_use_the_short_address_wherever_they_are_made() {
 
 #[test]
 fn live_pastes_use_the_short_address_wherever_they_are_made() {
-    for site in OLD_ADDRESSES {
+    for site in EVERY_ADDRESS {
         let fake = Fake::new();
         let req = post(
             "/paste",
@@ -80,7 +81,8 @@ fn live_pastes_use_the_short_address_wherever_they_are_made() {
         let response = answer(&fake, &at(site, req));
         let html = body(&response);
         assert!(html.contains(r#"href="https://s.4st.li/room""#), "{site}");
-        assert!(!html.contains(site), "{site}: {html}");
+        assert!(!html.contains("magi.4st.li"), "{site}: {html}");
+        assert!(!html.contains("r.4st.li"), "{site}: {html}");
     }
 }
 
@@ -109,6 +111,84 @@ fn an_old_address_can_still_connect_to_a_room() {
         run(&fake, &Config::default(), &socket),
         Outcome::LiveSocket { .. }
     ));
+}
+
+#[test]
+fn live_pages_open_at_home_where_the_owner_key_is() {
+    for site in OTHER_ADDRESSES {
+        for alias in ["room", VIEW] {
+            let fake = Fake::new();
+            seed_room(&fake);
+            let response = answer(&fake, &at(site, get(&format!("/{alias}"))));
+            assert_eq!(response.status, 302, "{site}/{alias}");
+            assert_eq!(
+                response.header("Location"),
+                Some(format!("{HOST}/{alias}").as_str()),
+                "{site}/{alias}"
+            );
+        }
+    }
+}
+
+#[test]
+fn live_pages_stay_put_at_home_and_on_a_try_out_deploy() {
+    for site in [HOST, PREVIEW] {
+        let fake = Fake::new();
+        seed_room(&fake);
+        let response = answer(&fake, &at(site, get("/room")));
+        assert_eq!(response.status, 200, "{site}");
+        assert!(body(&response).contains(r#"id="live-owner""#), "{site}");
+    }
+}
+
+#[test]
+fn a_protected_live_page_asks_for_its_password_only_at_home() {
+    let fake = Fake::new();
+    fake.store(
+        "room",
+        VIEW,
+        Some(LinkMeta {
+            kind: LinkKind::Live,
+            pw: Some("stored".to_owned()),
+            ..LinkMeta::default()
+        }),
+    );
+    let response = answer(&fake, &at("https://s.4st.li", get("/room")));
+    assert_eq!(response.status, 302);
+    assert_eq!(
+        response.header("Location"),
+        Some(format!("{HOST}/room").as_str())
+    );
+    assert!(body(&answer(&fake, &get("/room"))).contains(r#"name="password""#));
+}
+
+#[test]
+fn raw_text_never_moves() {
+    let fake = Fake::new();
+    seed_room(&fake);
+    fake.room_replies.borrow_mut().push_back(HttpReply {
+        status: 200,
+        body: "typed text".to_owned(),
+    });
+    let response = answer(&fake, &at("https://s.4st.li", get("/room?raw")));
+    assert_eq!(response.status, 200);
+    assert_eq!(body(&response), "typed text");
+}
+
+#[test]
+fn links_and_pastes_stay_on_the_address_they_were_opened_on() {
+    let fake = Fake::new();
+    fake.store(
+        "note",
+        "some text",
+        Some(LinkMeta {
+            kind: LinkKind::Paste,
+            ..LinkMeta::default()
+        }),
+    );
+    let paste = answer(&fake, &at("https://s.4st.li", get("/note")));
+    assert_eq!(paste.status, 200);
+    assert!(body(&paste).contains("some text"));
 }
 
 #[test]
