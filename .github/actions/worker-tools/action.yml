@@ -13,8 +13,5 @@ runs:
         bun-version-file: package.json
     - run: bun install --frozen-lockfile
       shell: bash
-    - name: Install the worker-build that matches the worker crate
+    - run: scripts/install-worker-build.sh
       shell: bash
-      run: |
-        version="$(cargo metadata --locked --format-version 1 | jq -r '.packages[] | select(.name == "worker") | .version')"
-        cargo install worker-build --locked --version "$version"
