@@ -46,11 +46,6 @@ const MAX_SAVED_LINKS = 50;
 const pick = (items) => items[Math.floor(Math.random() * items.length)];
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
-// Show the real host in the alias prefix (handy on preview deploys).
-document.querySelectorAll('[data-host]').forEach((prefix) => {
-  prefix.textContent = `${location.host}/`;
-});
-
 /* the worm */
 
 const worm = document.getElementById('worm');

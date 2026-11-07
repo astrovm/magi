@@ -21,6 +21,15 @@ impl std::fmt::Display for PlatformError {
 
 pub type Result<T> = std::result::Result<T, PlatformError>;
 
+/// Where short links live.
+const SHORT_ADDRESS: &str = "s.4st.li";
+/// These still answer, so links shared with them keep working.
+const OLD_ADDRESSES: [&str; 2] = ["magi.4st.li", "r.4st.li"];
+
+pub fn is_our_address(host: &str) -> bool {
+    host == SHORT_ADDRESS || OLD_ADDRESSES.contains(&host)
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PutOptions {
     pub expiration: Option<u64>,
@@ -219,6 +228,20 @@ impl Req {
 
     pub fn origin(&self) -> String {
         format!("{}://{}", self.url.scheme(), self.host())
+    }
+
+    /// The address links should say. A try-out deploy keeps its own.
+    pub fn short_host(&self) -> String {
+        let host = self.host();
+        if is_our_address(&host) {
+            SHORT_ADDRESS.to_owned()
+        } else {
+            host
+        }
+    }
+
+    pub fn short_origin(&self) -> String {
+        format!("{}://{}", self.url.scheme(), self.short_host())
     }
 
     pub fn query(&self, name: &str) -> Option<String> {
