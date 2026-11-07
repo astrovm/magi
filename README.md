@@ -37,7 +37,7 @@ Visit counts and self-destructs are approximate: Workers KV has no atomic counte
 ## 🛠️ Development
 
 The server is a Rust Cloudflare Worker: `core/` has the logic, `src/` connects it to Cloudflare, and `public/` has the static site.
-The toolchain comes from `rust-toolchain.toml`. You also need Bun, Node and `scripts/install-worker-build.sh` and `cargo install cargo-llvm-cov`.
+The toolchain comes from `rust-toolchain.toml`. You also need Bun, Node, `scripts/install-worker-build.sh` and `cargo install cargo-llvm-cov`.
 
 ```sh
 bun install
