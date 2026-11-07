@@ -52,7 +52,7 @@ bun run lint && bun run tsc
 
 ### Deploying
 
-Every merge to `master` deploys itself through Workers Builds, which runs `scripts/cloudflare-build.sh` and then `wrangler deploy`.
+Every merge to `master` deploys itself from GitHub Actions, once the tests pass on the merged code. It needs the `CLOUDFLARE_API_TOKEN` repo secret.
 `s.4st.li`, `magi.4st.li` and `r.4st.li` reach the Worker through routes set on Cloudflare, not in `wrangler.jsonc`.
 
 `scripts/try-on-cloudflare.sh` tries a branch on real Cloudflare, on a throwaway Worker and KV namespace that it deletes afterwards.
