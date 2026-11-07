@@ -1,6 +1,7 @@
 //! Reading what people typed into the link form.
 
 use crate::platform::Form;
+use crate::platform::is_our_address;
 use crate::responses::ResponseKey;
 use crate::store::LinkMeta;
 use crate::target::Target;
@@ -62,7 +63,7 @@ pub fn parse_target(input: &str, own_host: &str) -> Result<Target, ResponseKey> 
     if target.is_too_long() {
         return Err(ResponseKey::InvalidUrl);
     }
-    if target.host() == own_host {
+    if target.host() == own_host || is_our_address(target.host()) {
         return Err(ResponseKey::OwnTail);
     }
     Ok(target)

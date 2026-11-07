@@ -207,7 +207,7 @@ async fn orb_post<P: Platform>(platform: &P, config: &Config, req: &Req) -> Resu
     Ok(link_created(
         req,
         &CreatedLink {
-            short_url: &format!("{}/{}", req.origin(), claimed.alias),
+            short_url: &format!("{}/{}", req.short_origin(), claimed.alias),
             manage_key: &manage_key,
             alias: &claimed.alias,
             telegram_bot: config.telegram_bot_username.as_deref(),
@@ -289,7 +289,7 @@ async fn paste_post<P: Platform>(platform: &P, config: &Config, req: &Req) -> Re
     Ok(link_created(
         req,
         &CreatedLink {
-            short_url: &format!("{}/{}", req.origin(), claimed.alias),
+            short_url: &format!("{}/{}", req.short_origin(), claimed.alias),
             manage_key: &manage_key,
             alias: &claimed.alias,
             telegram_bot: config.telegram_bot_username.as_deref(),
@@ -374,7 +374,7 @@ async fn live_post<P: Platform>(
     )
     .await?;
 
-    let origin = req.origin();
+    let origin = req.short_origin();
     Ok(link_created(
         req,
         &CreatedLink {
@@ -653,7 +653,7 @@ async fn live_response<P: Platform>(
         }
         return Ok(raw_text(&reply.body));
     }
-    let origin = req.origin();
+    let origin = req.short_origin();
     let host = req.host();
     let edit_url = format!("{origin}/{}", lookup.alias);
     let view_url = format!("{origin}/{}", record.url);
@@ -728,7 +728,7 @@ async fn visit<P: Platform>(
         Background::RecordVisit(Box::new(Visit {
             alias_hash: lookup.alias_hash.clone(),
             record: record.clone(),
-            short_link: format!("{}/{}", req.host(), lookup.alias),
+            short_link: format!("{}/{}", req.short_host(), lookup.alias),
             target,
             user_agent: req.user_agent.clone(),
             place: req.place.clone(),
@@ -749,7 +749,7 @@ async fn alias_get<P: Platform>(platform: &P, req: &Req, raw: &str) -> Result<Ou
     };
     if lookup.peek {
         let clicks = get_clicks(platform, &lookup.alias_hash).await?;
-        let host = req.host();
+        let host = req.short_host();
         return Ok(preview_page(&PreviewDetails {
             alias: &lookup.alias,
             host: &host,
