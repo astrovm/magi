@@ -3,7 +3,7 @@
 use std::future::Future;
 
 use serde::{Deserialize, Serialize};
-use url::Url;
+use url::{Position, Url};
 
 use crate::live::Role;
 use crate::store::LinkMeta;
@@ -23,11 +23,14 @@ pub type Result<T> = std::result::Result<T, PlatformError>;
 
 /// Where short links live.
 const SHORT_ADDRESS: &str = "s.4st.li";
-/// These still answer, so links shared with them keep working.
-const OLD_ADDRESSES: [&str; 2] = ["magi.4st.li", "r.4st.li"];
+/// Where the site lives. A browser keeps manage keys per address, so pages that
+/// need them open here.
+const HOME_ADDRESS: &str = "magi.4st.li";
+/// This one still answers, so links shared with it keep working.
+const OLD_ADDRESS: &str = "r.4st.li";
 
 pub fn is_our_address(host: &str) -> bool {
-    host == SHORT_ADDRESS || OLD_ADDRESSES.contains(&host)
+    [SHORT_ADDRESS, HOME_ADDRESS, OLD_ADDRESS].contains(&host)
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -242,6 +245,16 @@ impl Req {
 
     pub fn short_origin(&self) -> String {
         format!("{}://{}", self.url.scheme(), self.short_host())
+    }
+
+    /// This page at the site's home, if we aren't there. A try-out deploy stays.
+    pub fn url_at_home(&self) -> Option<String> {
+        let host = self.host();
+        (host != HOME_ADDRESS && is_our_address(&host)).then(|| {
+            let scheme = self.url.scheme();
+            let rest = &self.url[Position::BeforePath..];
+            format!("{scheme}://{HOME_ADDRESS}{rest}")
+        })
     }
 
     pub fn query(&self, name: &str) -> Option<String> {
