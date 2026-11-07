@@ -7,17 +7,25 @@ use crate::guards::{
     CREATE_LIMIT, UNLOCK_LIMIT, count_attempt, is_dangerous, is_limited, limit_key,
     passes_turnstile,
 };
-use crate::pages::{
-    PreviewDetails, UnlockState, countdown_page, not_found_page, preview_page, unlock_page,
+use crate::live::{
+    ROOM_INIT, ROOM_LOCK, ROOM_RESTORE, ROOM_SNAPSHOTS, ROOM_TEXT, ROOM_UNLOCK, ROOM_WIPE, Role,
+    RoomInit,
 };
-use crate::platform::{Body, Config, Form, Method, Outcome, Platform, Req, Res, Result};
+use crate::pages::{
+    LivePage, PreviewDetails, UnlockState, countdown_page, live_page, not_found_page, paste_page,
+    preview_page, raw_text, unlock_page,
+};
+use crate::paste::{DEFAULT_PASTE_SECONDS, MAX_PASTE_BYTES, check_text, find_urls, normalize_text};
+use crate::platform::{
+    Body, Config, Form, Method, Outcome, Platform, PlatformError, Req, Res, Result,
+};
 use crate::responses::{
     CreatedLink, ORB_LINK_NOT_FOUND_MESSAGE, ORB_WRONG_KEY_MESSAGE, ResponseKey, get_response,
     link_created,
 };
 use crate::secrets::{hash_password, random_token, sha256_hex, timing_safe_equal, verify_password};
 use crate::spells::{parse_fortunes, parse_spells, parse_target};
-use crate::store::{LinkMeta, LinkRecord, delete_link, get_clicks, get_link, put_link};
+use crate::store::{LinkKind, LinkMeta, LinkRecord, delete_link, get_clicks, get_link, put_link};
 use crate::telegram::{TelegramCommand, parse_command, send_message};
 use crate::text::js_trim;
 use crate::visits::{Background, Visit, needs_every_visit, pick_destination, redirect_to};
@@ -25,6 +33,13 @@ use crate::words::summon_wizard_words;
 
 const RANDOM_ALIAS_ATTEMPTS: u32 = 5;
 const MANAGE_KEY_BYTES: usize = 16;
+
+/// Stands in for the destination in visit alerts: the text stays out of Telegram.
+const PASTE_VISIT_LABEL: &str = "📋 the paste";
+const LIVE_SOCKET_PREFIX: &str = "paste/ws/";
+const LIVE_VISIT_LABEL: &str = "✍️ the live paste";
+/// How unguessable a view-only link is.
+const VIEW_ALIAS_BYTES: usize = 16;
 
 const TELEGRAM_HELP: &str = "hi, i'm the orb's snitch 🔮\nsend /alert <alias> <manage key> and i'll ping you when someone opens that link.\nsend it again to make me stop.";
 
@@ -90,6 +105,36 @@ async fn orb_get<P: Platform>(platform: &P, config: &Config, req: &Req) -> Resul
     ))
 }
 
+/// What a visitor has to pass before creating anything.
+async fn check_visitor<P: Platform>(
+    platform: &P,
+    config: &Config,
+    req: &Req,
+    form: &Form,
+) -> Result<std::result::Result<String, ResponseKey>> {
+    let create_key = limit_key("create", req);
+    if is_limited(platform, &create_key, CREATE_LIMIT).await? {
+        return Ok(Err(ResponseKey::TooMany));
+    }
+    let token = form.text("cf-turnstile-response");
+    if !passes_turnstile(platform, config.turnstile_secret_key.as_deref(), token, req).await {
+        return Ok(Err(ResponseKey::NotHuman));
+    }
+    Ok(Ok(create_key))
+}
+
+async fn claim_from_form<P: Platform>(
+    platform: &P,
+    form: &Form,
+) -> Result<std::result::Result<Claimed, ResponseKey>> {
+    let alias_field = form.text("alias").unwrap_or_default();
+    if js_trim(alias_field).is_empty() {
+        claim_random_alias(platform).await
+    } else {
+        claim_custom_alias(platform, alias_field).await
+    }
+}
+
 async fn orb_post<P: Platform>(platform: &P, config: &Config, req: &Req) -> Result<Res> {
     let Some(form) = req.form() else {
         return Ok(get_response(req, ResponseKey::InvalidRequest));
@@ -101,14 +146,10 @@ async fn orb_post<P: Platform>(platform: &P, config: &Config, req: &Req) -> Resu
         return Ok(get_response(req, ResponseKey::InvalidRequest));
     }
 
-    let create_key = limit_key("create", req);
-    if is_limited(platform, &create_key, CREATE_LIMIT).await? {
-        return Ok(get_response(req, ResponseKey::TooMany));
-    }
-    let token = form.text("cf-turnstile-response");
-    if !passes_turnstile(platform, config.turnstile_secret_key.as_deref(), token, req).await {
-        return Ok(get_response(req, ResponseKey::NotHuman));
-    }
+    let create_key = match check_visitor(platform, config, req, form).await? {
+        Ok(create_key) => create_key,
+        Err(key) => return Ok(get_response(req, key)),
+    };
 
     let now = platform.now_ms();
     let Some(spells) = parse_spells(form, now) else {
@@ -136,13 +177,7 @@ async fn orb_post<P: Platform>(platform: &P, config: &Config, req: &Req) -> Resu
         return Ok(get_response(req, ResponseKey::DangerUrl));
     }
 
-    let alias_field = form.text("alias").unwrap_or_default();
-    let claimed = if js_trim(alias_field).is_empty() {
-        claim_random_alias(platform).await?
-    } else {
-        claim_custom_alias(platform, alias_field).await?
-    };
-    let claimed = match claimed {
+    let claimed = match claim_from_form(platform, form).await? {
         Ok(claimed) => claimed,
         Err(key) => return Ok(get_response(req, key)),
     };
@@ -176,8 +211,270 @@ async fn orb_post<P: Platform>(platform: &P, config: &Config, req: &Req) -> Resu
             manage_key: &manage_key,
             alias: &claimed.alias,
             telegram_bot: config.telegram_bot_username.as_deref(),
+            kind: LinkKind::Link,
+            view_url: None,
         },
     ))
+}
+
+async fn paste_post<P: Platform>(platform: &P, config: &Config, req: &Req) -> Result<Res> {
+    let Some(form) = req.form() else {
+        return Ok(get_response(req, ResponseKey::InvalidRequest));
+    };
+    let Some(text) = form.text("text") else {
+        return Ok(get_response(req, ResponseKey::InvalidRequest));
+    };
+    if form.is_file("alias") {
+        return Ok(get_response(req, ResponseKey::InvalidRequest));
+    }
+
+    let create_key = match check_visitor(platform, config, req, form).await? {
+        Ok(create_key) => create_key,
+        Err(key) => return Ok(get_response(req, key)),
+    };
+
+    if form.is_on("live") {
+        return live_post(platform, config, req, form, text, &create_key).await;
+    }
+
+    let now = platform.now_ms();
+    let Some(spells) = parse_spells(form, now) else {
+        return Ok(get_response(req, ResponseKey::BadSpell));
+    };
+    let text = normalize_text(text);
+    if let Err(key) = check_text(&text) {
+        return Ok(get_response(req, key));
+    }
+    let urls = find_urls(&text);
+    if is_dangerous(platform, config.safe_browsing_api_key.as_deref(), &urls).await {
+        return Ok(get_response(req, ResponseKey::DangerUrl));
+    }
+    let claimed = match claim_from_form(platform, form).await? {
+        Ok(claimed) => claimed,
+        Err(key) => return Ok(get_response(req, key)),
+    };
+
+    let manage_key = random_token(platform, MANAGE_KEY_BYTES)?;
+    let pw = match &spells.password {
+        Some(password) => Some(hash_password(platform, password).await?),
+        None => None,
+    };
+    // Leaving the choice out means the default. Choosing "never" sends it empty.
+    let exp = if form.get("expires").is_none() {
+        Some(now / 1000 + DEFAULT_PASTE_SECONDS)
+    } else {
+        spells.meta.exp
+    };
+    count_attempt(platform, &create_key, CREATE_LIMIT).await?;
+    put_link(
+        platform,
+        &claimed.alias_hash,
+        &LinkRecord {
+            url: text,
+            more: Vec::new(),
+            meta: LinkMeta {
+                kind: LinkKind::Paste,
+                created: Some(now),
+                key: Some(sha256_hex(&manage_key)),
+                pw,
+                max: spells.meta.max,
+                count: spells.meta.count,
+                exp,
+                ..LinkMeta::default()
+            },
+        },
+    )
+    .await?;
+
+    Ok(link_created(
+        req,
+        &CreatedLink {
+            short_url: &format!("{}/{}", req.origin(), claimed.alias),
+            manage_key: &manage_key,
+            alias: &claimed.alias,
+            telegram_bot: config.telegram_bot_username.as_deref(),
+            kind: LinkKind::Paste,
+            view_url: None,
+        },
+    ))
+}
+
+/// A live paste is two aliases and a room: one alias edits, the other is a
+/// random one that can only watch and doesn't reveal the first.
+async fn live_post<P: Platform>(
+    platform: &P,
+    config: &Config,
+    req: &Req,
+    form: &Form,
+    text: &str,
+    create_key: &str,
+) -> Result<Res> {
+    let text = normalize_text(text);
+    if text.len() > MAX_PASTE_BYTES {
+        return Ok(get_response(req, ResponseKey::PasteTooBig));
+    }
+    let urls = find_urls(&text);
+    if is_dangerous(platform, config.safe_browsing_api_key.as_deref(), &urls).await {
+        return Ok(get_response(req, ResponseKey::DangerUrl));
+    }
+    let claimed = match claim_from_form(platform, form).await? {
+        Ok(claimed) => claimed,
+        Err(key) => return Ok(get_response(req, key)),
+    };
+
+    let manage_key = random_token(platform, MANAGE_KEY_BYTES)?;
+    let view_alias = random_token(platform, VIEW_ALIAS_BYTES)?;
+    let view_hash = Alias::new(&view_alias).hash();
+    let now = platform.now_ms();
+    count_attempt(platform, create_key, CREATE_LIMIT).await?;
+
+    // The room comes first. If the rest fails, it cleans up after itself.
+    let init = RoomInit {
+        text,
+        link_hash: claimed.alias_hash.clone(),
+        view_hash: view_hash.clone(),
+    };
+    // Strings always serialize. An empty body would only get the room to refuse.
+    let body = serde_json::to_string(&init).unwrap_or_default();
+    let reply = platform
+        .live_call(&claimed.alias_hash, ROOM_INIT, body)
+        .await?;
+    if reply.status != 200 {
+        return Err(PlatformError(format!("room init: {}", reply.status)));
+    }
+    let base = LinkMeta {
+        created: Some(now),
+        ..LinkMeta::default()
+    };
+    put_link(
+        platform,
+        &view_hash,
+        &LinkRecord {
+            url: claimed.alias_hash.clone(),
+            more: Vec::new(),
+            meta: LinkMeta {
+                kind: LinkKind::View,
+                ..base.clone()
+            },
+        },
+    )
+    .await?;
+    put_link(
+        platform,
+        &claimed.alias_hash,
+        &LinkRecord {
+            url: view_alias.clone(),
+            more: Vec::new(),
+            meta: LinkMeta {
+                kind: LinkKind::Live,
+                key: Some(sha256_hex(&manage_key)),
+                ..base
+            },
+        },
+    )
+    .await?;
+
+    let origin = req.origin();
+    Ok(link_created(
+        req,
+        &CreatedLink {
+            short_url: &format!("{origin}/{}", claimed.alias),
+            manage_key: &manage_key,
+            alias: &claimed.alias,
+            telegram_bot: config.telegram_bot_username.as_deref(),
+            kind: LinkKind::Live,
+            view_url: Some(&format!("{origin}/{view_alias}")),
+        },
+    ))
+}
+
+/// What the owner of a live paste can do, with the manage key already checked.
+async fn manage_live<P: Platform>(
+    platform: &P,
+    req: &Req,
+    alias_hash: &str,
+    record: &LinkRecord,
+    action: &str,
+) -> Result<Res> {
+    match action {
+        "banish" => {
+            platform
+                .live_call(alias_hash, ROOM_WIPE, String::new())
+                .await?;
+            delete_link(platform, &Alias::new(&record.url).hash()).await?;
+            delete_link(platform, alias_hash).await?;
+            Ok(get_response(req, ResponseKey::PasteBanished))
+        }
+        "lock" => {
+            platform
+                .live_call(alias_hash, ROOM_LOCK, String::new())
+                .await?;
+            Ok(get_response(req, ResponseKey::LiveLocked))
+        }
+        "unlock" => {
+            platform
+                .live_call(alias_hash, ROOM_UNLOCK, String::new())
+                .await?;
+            Ok(get_response(req, ResponseKey::LiveUnlocked))
+        }
+        "snapshots" => {
+            let reply = platform
+                .live_call(alias_hash, ROOM_SNAPSHOTS, String::new())
+                .await?;
+            Ok(Res::new(reply.status)
+                .with_header("Content-Type", "application/json; charset=utf-8")
+                .with_header("Cache-Control", "no-store")
+                .with_body(reply.body))
+        }
+        "restore" => {
+            let id = req
+                .form()
+                .and_then(|form| form.text("snapshot"))
+                .and_then(|snapshot| snapshot.parse::<u32>().ok());
+            let Some(id) = id else {
+                return Ok(get_response(req, ResponseKey::InvalidRequest));
+            };
+            let path = format!("{ROOM_RESTORE}{id}");
+            let reply = platform.live_call(alias_hash, &path, String::new()).await?;
+            Ok(get_response(
+                req,
+                if reply.status == 200 {
+                    ResponseKey::LiveRestored
+                } else {
+                    ResponseKey::InvalidRequest
+                },
+            ))
+        }
+        _ => Ok(get_response(req, ResponseKey::LiveNoTransmute)),
+    }
+}
+
+async fn transmute_paste<P: Platform>(
+    platform: &P,
+    config: &Config,
+    req: &Req,
+    alias_hash: &str,
+    record: LinkRecord,
+) -> Result<Res> {
+    let field = req.form().and_then(|form| form.text("text"));
+    let text = normalize_text(field.unwrap_or_default());
+    if let Err(key) = check_text(&text) {
+        return Ok(get_response(req, key));
+    }
+    let urls = find_urls(&text);
+    if is_dangerous(platform, config.safe_browsing_api_key.as_deref(), &urls).await {
+        return Ok(get_response(req, ResponseKey::DangerUrl));
+    }
+    put_link(
+        platform,
+        alias_hash,
+        &LinkRecord {
+            url: text,
+            ..record
+        },
+    )
+    .await?;
+    Ok(get_response(req, ResponseKey::PasteTransmuted))
 }
 
 fn holds_key(record: &LinkRecord, key: &str) -> bool {
@@ -195,8 +492,11 @@ async fn manage_post<P: Platform>(platform: &P, config: &Config, req: &Req) -> R
     let alias_field = form.text("alias").filter(|field| !field.is_empty());
     let key_field = form.text("key").filter(|field| !field.is_empty());
     let action = form.text("action");
-    let (Some(alias_field), Some(key_field), Some("transmute" | "banish")) =
-        (alias_field, key_field, action)
+    let (
+        Some(alias_field),
+        Some(key_field),
+        Some(action @ ("transmute" | "banish" | "lock" | "unlock" | "snapshots" | "restore")),
+    ) = (alias_field, key_field, action)
     else {
         return Ok(get_response(req, ResponseKey::InvalidRequest));
     };
@@ -209,9 +509,23 @@ async fn manage_post<P: Platform>(platform: &P, config: &Config, req: &Req) -> R
         return Ok(get_response(req, ResponseKey::WrongKey));
     }
 
-    if action == Some("banish") {
+    if record.meta.kind == LinkKind::Live {
+        return manage_live(platform, req, &alias_hash, &record, action).await;
+    }
+    if !matches!(action, "transmute" | "banish") {
+        return Ok(get_response(req, ResponseKey::InvalidRequest));
+    }
+    if action == "banish" {
         delete_link(platform, &alias_hash).await?;
-        return Ok(get_response(req, ResponseKey::LinkBanished));
+        let banished = if record.meta.kind == LinkKind::Paste {
+            ResponseKey::PasteBanished
+        } else {
+            ResponseKey::LinkBanished
+        };
+        return Ok(get_response(req, banished));
+    }
+    if record.meta.kind == LinkKind::Paste {
+        return transmute_paste(platform, config, req, &alias_hash, record).await;
     }
 
     let target = match parse_target(form.text("url").unwrap_or_default(), &req.host()) {
@@ -315,6 +629,43 @@ async fn look_up<P: Platform>(platform: &P, raw: &str) -> Result<Option<Lookup>>
     }))
 }
 
+/// The live paste an alias belongs to, and what visitors can do with it.
+fn live_room(lookup: &Lookup, record: &LinkRecord) -> Option<(String, Role)> {
+    match record.meta.kind {
+        LinkKind::Live => Some((lookup.alias_hash.clone(), Role::Edit)),
+        LinkKind::View => Some((record.url.clone(), Role::View)),
+        LinkKind::Link | LinkKind::Paste => None,
+    }
+}
+
+async fn live_response<P: Platform>(
+    platform: &P,
+    req: &Req,
+    lookup: &Lookup,
+    record: &LinkRecord,
+    room: &str,
+    role: Role,
+) -> Result<Res> {
+    if req.query("raw").is_some() {
+        let reply = platform.live_call(room, ROOM_TEXT, String::new()).await?;
+        if reply.status != 200 {
+            return Ok(not_found_page());
+        }
+        return Ok(raw_text(&reply.body));
+    }
+    let origin = req.origin();
+    let host = req.host();
+    let edit_url = format!("{origin}/{}", lookup.alias);
+    let view_url = format!("{origin}/{}", record.url);
+    Ok(live_page(&LivePage {
+        alias: &lookup.alias,
+        host: &host,
+        role,
+        edit_url: &edit_url,
+        view_url: (role == Role::Edit).then_some(view_url.as_str()),
+    }))
+}
+
 async fn visit<P: Platform>(
     platform: &P,
     req: &Req,
@@ -334,17 +685,45 @@ async fn visit<P: Platform>(
         });
     }
 
-    let target = pick_destination(record, || platform.random());
     let tracked = needs_every_visit(record);
+    let (target, response) = match meta.kind {
+        LinkKind::Paste if req.query("raw").is_some() => {
+            (PASTE_VISIT_LABEL.to_owned(), raw_text(&record.url))
+        }
+        LinkKind::Paste => (
+            PASTE_VISIT_LABEL.to_owned(),
+            paste_page(&lookup.alias, record),
+        ),
+        LinkKind::Live => (
+            LIVE_VISIT_LABEL.to_owned(),
+            live_response(
+                platform,
+                req,
+                lookup,
+                record,
+                &lookup.alias_hash,
+                Role::Edit,
+            )
+            .await?,
+        ),
+        LinkKind::View => (
+            LIVE_VISIT_LABEL.to_owned(),
+            live_response(platform, req, lookup, record, &record.url, Role::View).await?,
+        ),
+        LinkKind::Link => {
+            let target = pick_destination(record, || platform.random());
+            let response = if meta.wait && req.method != Method::Head {
+                countdown_page(&target)
+            } else {
+                redirect_to(&target, !tracked)
+            };
+            (target, response)
+        }
+    };
     // HEAD is what link checkers send: answer like GET, but it isn't a visit.
     if req.method == Method::Head {
-        return Ok(redirect_to(&target, !tracked).into());
+        return Ok(response.into());
     }
-    let response = if meta.wait {
-        countdown_page(&target)
-    } else {
-        redirect_to(&target, !tracked)
-    };
     let background = tracked.then(|| {
         Background::RecordVisit(Box::new(Visit {
             alias_hash: lookup.alias_hash.clone(),
@@ -380,7 +759,7 @@ async fn alias_get<P: Platform>(platform: &P, req: &Req, raw: &str) -> Result<Ou
         .into());
     }
     if record.meta.pw.is_some() {
-        return Ok(unlock_page(&lookup.alias, UnlockState::Ask).into());
+        return Ok(unlock_page(&lookup.alias, UnlockState::Ask, req.query("raw").is_some()).into());
     }
     visit(platform, req, &lookup, record).await
 }
@@ -400,15 +779,44 @@ async fn alias_post<P: Platform>(platform: &P, req: &Req, raw: &str) -> Result<O
         return visit(platform, req, &lookup, record).await;
     };
 
+    let raw = req.query("raw").is_some();
     let unlock_key = limit_key(&format!("unlock:{}", lookup.alias_hash), req);
     if is_limited(platform, &unlock_key, UNLOCK_LIMIT).await? {
-        return Ok(unlock_page(&lookup.alias, UnlockState::Locked).into());
+        return Ok(unlock_page(&lookup.alias, UnlockState::Locked, raw).into());
     }
     if !verify_password(platform, password, stored).await? {
         count_attempt(platform, &unlock_key, UNLOCK_LIMIT).await?;
-        return Ok(unlock_page(&lookup.alias, UnlockState::Wrong).into());
+        return Ok(unlock_page(&lookup.alias, UnlockState::Wrong, raw).into());
     }
     visit(platform, req, &lookup, record).await
+}
+
+/// `GET /paste/ws/<alias>` connects a browser to the room behind an alias.
+async fn live_socket<P: Platform>(platform: &P, req: &Req, raw: &str) -> Result<Outcome> {
+    if !req.is_websocket {
+        return Ok(Res::new(426).with_header("Upgrade", "websocket").into());
+    }
+    // A link is all it takes to get in, but other sites shouldn't get to use
+    // their visitors' browsers for it.
+    let origin = req.origin();
+    if req
+        .origin_header
+        .as_deref()
+        .is_some_and(|sent| sent != origin)
+    {
+        return Ok(Res::new(403).into());
+    }
+    let room = match look_up(platform, raw).await? {
+        Some(lookup) => lookup
+            .record
+            .as_ref()
+            .and_then(|record| live_room(&lookup, record)),
+        None => None,
+    };
+    Ok(match room {
+        Some((room, role)) => Outcome::LiveSocket { room, role },
+        None => Res::new(404).into(),
+    })
 }
 
 /// Answers one request.
@@ -417,12 +825,16 @@ pub async fn handle<P: Platform>(platform: &P, config: &Config, req: &Req) -> Re
     let path = path.strip_suffix('/').unwrap_or(path);
     let path = path.strip_prefix('/').unwrap_or(path);
 
+    if let (Method::Get, Some(raw)) = (req.method, path.strip_prefix(LIVE_SOCKET_PREFIX)) {
+        return live_socket(platform, req, raw).await;
+    }
     let single_segment = !path.is_empty() && !path.contains('/');
     match (req.method, path) {
         (Method::Other, _) => Ok(Res::new(405).into()),
         (Method::Get | Method::Head, "") => Ok(Outcome::Asset),
         (Method::Get, "orb") => Ok(orb_get(platform, config, req).await?.into()),
         (Method::Post, "orb") => Ok(orb_post(platform, config, req).await?.into()),
+        (Method::Post, "paste") => Ok(paste_post(platform, config, req).await?.into()),
         (Method::Post, "manage") => Ok(manage_post(platform, config, req).await?.into()),
         (Method::Post, "telegram") => Ok(telegram_post(platform, config, req).await?.into()),
         (Method::Post, _) if single_segment => alias_post(platform, req, path).await,

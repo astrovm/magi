@@ -22,6 +22,7 @@ const WORM_LINES = [
   '301 moved permanently. like me, from the dirt to the forest.',
   'curse a link. do it. nobody will know it was you.',
   'add a + to any link and the orb spills the tea.',
+  'i keep your pastes in the orb. i have not read them. much.',
 ];
 
 const CHEER_LINES = [
@@ -248,11 +249,17 @@ const ALIAS_LABELS = { free: '✅ free', taken: '❌ taken', invalid: '❌ not a
 let aliasTimer;
 let aliasRequest = 0;
 
-aliasInput?.addEventListener('input', () => {
+// Also cancels a check still on its way, whose answer would be about old text.
+function clearAliasStatus() {
   clearTimeout(aliasTimer);
-  const value = aliasInput.value.trim();
+  aliasRequest += 1;
   aliasStatus.textContent = '';
   delete aliasStatus.dataset.status;
+}
+
+aliasInput?.addEventListener('input', () => {
+  clearAliasStatus();
+  const value = aliasInput.value.trim();
   if (value === '') {
     return;
   }
@@ -270,6 +277,65 @@ aliasInput?.addEventListener('input', () => {
   }, 400);
 });
 
+/* link and paste share one form */
+
+const summonForm = document.getElementById('summon-form');
+const summonTabs = [...document.querySelectorAll('#summon-tabs [role="tab"]')];
+
+function applyTab(tab) {
+  summonTabs.forEach((each) => {
+    const selected = each === tab;
+    each.setAttribute('aria-selected', String(selected));
+    each.tabIndex = selected ? 0 : -1;
+  });
+  const spells = document.getElementById('summon-spells');
+  spells.hidden = false;
+  spells.querySelectorAll('input, select, textarea').forEach((field) => {
+    field.disabled = false;
+  });
+  pasteText.required = true;
+  liveToggle.checked = false;
+  summonForm.setAttribute('action', tab.dataset.action);
+  summonForm.setAttribute('aria-labelledby', tab.id);
+  summonForm.querySelector('#summon-button').textContent = tab.dataset.label;
+  summonForm.elements.expires.value = tab.dataset.expires;
+  summonForm.querySelectorAll('[data-only]').forEach((element) => {
+    const shown = element.dataset.only === tab.dataset.tab;
+    element.hidden = !shown;
+    if ('disabled' in element) {
+      element.disabled = !shown;
+    }
+    // Spells hidden on this tab must not be sent with the form.
+    element.querySelectorAll('input, textarea').forEach((field) => { field.disabled = !shown; });
+  });
+}
+
+// Live pastes have an editor and owner tools instead of spells. Their text can
+// start empty, too.
+const liveToggle = document.getElementById('live-toggle');
+const pasteText = document.getElementById('text');
+liveToggle?.addEventListener('change', () => {
+  const spells = document.getElementById('summon-spells');
+  spells.hidden = liveToggle.checked;
+  spells.querySelectorAll('input, select, textarea').forEach((field) => {
+    field.disabled = liveToggle.checked || field.closest('[data-only="link"]') !== null;
+  });
+  pasteText.required = !liveToggle.checked;
+  document.getElementById('summon-button').textContent = liveToggle.checked ? 'Summon live paste' : 'Summon paste';
+});
+
+summonTabs.forEach((tab, index) => {
+  tab.addEventListener('click', () => applyTab(tab));
+  tab.addEventListener('keydown', (event) => {
+    const step = { ArrowRight: 1, ArrowLeft: -1 }[event.key];
+    if (step) {
+      const next = summonTabs[(index + step + summonTabs.length) % summonTabs.length];
+      applyTab(next);
+      next.focus();
+    }
+  });
+});
+
 /* forms talk to the orb without leaving the page */
 
 document.querySelectorAll('form[data-orb]').forEach((form) => {
@@ -284,7 +350,7 @@ document.querySelectorAll('form[data-orb]').forEach((form) => {
 
     // Read the fields before disabling buttons, or the clicked action gets lost.
     const body = new FormData(form, button);
-    const label = button?.textContent;
+    let label = button?.textContent;
     form.querySelectorAll('button').forEach((each) => { each.disabled = true; });
     if (button) {
       button.textContent = pick(LOADING_LINES);
@@ -308,7 +374,10 @@ document.querySelectorAll('form[data-orb]').forEach((form) => {
         }
         if (form.hasAttribute('data-reset')) {
           form.reset();
-          aliasStatus.textContent = '';
+          const tab = summonTabs.find((each) => each.getAttribute('aria-selected') === 'true');
+          applyTab(tab);
+          label = tab.dataset.label;
+          clearAliasStatus();
           wormRain(8);
         }
         setMood('cheer');
@@ -339,11 +408,12 @@ document.addEventListener('click', async (event) => {
   if (!button) {
     return;
   }
-  await navigator.clipboard.writeText(button.dataset.copy);
+  const source = button.dataset.copyFrom && document.querySelector(button.dataset.copyFrom);
+  await navigator.clipboard.writeText(source ? source.textContent : button.dataset.copy);
   button.textContent = 'copied ✨';
   button.classList.add('copied');
   setTimeout(() => {
-    button.textContent = 'copy';
+    button.textContent = button.dataset.label ?? 'copy';
     button.classList.remove('copied');
   }, 1500);
 });

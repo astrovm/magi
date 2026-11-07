@@ -9,13 +9,15 @@ It shrinks links. Mostly.
 
 - **Custom or random aliases**: leave the alias empty and the worm picks one, like `sneaky-worm-42`.
 - **Paste without `https://`**: `example.com` works.
+- **Paste**: text instead of a link, with the same aliases, password, self-destruct, expiration, count, peek, QR and manage key. Lasts 30 days unless you pick otherwise. Up to 512 KB, shown as plain text, with `?raw` for the text alone. Self-destruct is approximate, so don't use it for real secrets.
+- **Live paste**: tick **live** and everyone with the link edits together, with cursors and all. You also get a view-only link. Your browser gets the owner tools: **Lock**, **Banish** and restoring the last 20 versions. It disappears after 30 days without edits.
 - **Peek**: add `+` to any link (`s.4st.li/cool+`) to see where it goes before clicking.
 - **Password**: visitors have to say the magic word.
 - **Self-destruct**: the link dies after N visits.
 - **Expiration**: 1 hour, 1 day, 1 week or 30 days.
 - **Count visits**: shown on the peek page.
 - **Curse**: 10% of visits get rickrolled.
-- **Manage key**: shown once when you create a link. Use it to **Transmute** (change the destination) or **Banish** (delete) the link.
+- **Manage key**: shown once when you create a link. Use it to **Transmute** (change the destination or the text) or **Banish** (delete) the link.
 - **Telegram alerts**: get a message with the city, country and browser of each visit. No IPs.
 - **Fortune cookie**: each visit goes to a random link from your list.
 - **Countdown**: visitors wait 5 seconds while the worm charges the orb.
@@ -25,10 +27,10 @@ It shrinks links. Mostly.
 
 ## 🛡️ Abuse protection
 
-- Each visitor can create 30 links per hour.
+- Each visitor can create 30 links or pastes per hour.
 - 5 wrong passwords lock that visitor out of the link for 15 minutes.
 - **Turnstile** (optional): set `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` to ask for a human check before creating links.
-- **Safe Browsing** (optional): set `SAFE_BROWSING_API_KEY` to refuse links Google flags as phishing or malware.
+- **Safe Browsing** (optional): set `SAFE_BROWSING_API_KEY` to refuse links, and pastes that mention links, Google flags as phishing or malware.
 
 Visit counts and self-destructs are approximate: Workers KV has no atomic counters and caches reads for up to 5 minutes.
 
@@ -47,6 +49,13 @@ cargo clippy -p magi --target wasm32-unknown-unknown -- -D warnings
 cargo clippy -p magi-core --all-targets -- -D warnings
 bun run lint && bun run tsc
 ```
+
+### Deploying
+
+Every merge to `master` deploys itself from GitHub Actions, once the tests pass on the merged code. It needs the `CLOUDFLARE_API_TOKEN` repo secret.
+`s.4st.li`, `magi.4st.li` and `r.4st.li` reach the Worker through routes set on Cloudflare, not in `wrangler.jsonc`.
+
+`scripts/try-on-cloudflare.sh` tries a branch on real Cloudflare, on a throwaway Worker and KV namespace that it deletes afterwards.
 
 ## 📡 Telegram alerts
 

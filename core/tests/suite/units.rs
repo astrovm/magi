@@ -15,8 +15,8 @@ use magi_core::secrets::{
 };
 use magi_core::spells::{MAX_FORTUNES, parse_fortunes, parse_spells, parse_target};
 use magi_core::store::{
-    LINK_CACHE_TTL, LinkMeta, LinkRecord, add_click, clicks_key, delete_link, get_clicks, get_link,
-    put_link,
+    LINK_CACHE_TTL, LinkKind, LinkMeta, LinkRecord, add_click, clicks_key, delete_link, get_clicks,
+    get_link, put_link,
 };
 use magi_core::target::{MAX_URL_LENGTH, Target, header_value, with_scheme};
 use magi_core::telegram::{describe_device, describe_place, parse_command};
@@ -125,7 +125,7 @@ mod alias {
     fn exposes_the_limits() {
         assert_eq!(MAX_ALIAS_LENGTH, 13312);
         assert_eq!(MAX_URL_LENGTH, 2048);
-        assert_eq!(RESERVED_ALIASES, ["orb", "manage", "telegram"]);
+        assert_eq!(RESERVED_ALIASES, ["orb", "manage", "paste", "telegram"]);
     }
 
     #[test]
@@ -985,6 +985,7 @@ mod pages_and_responses {
                 title: Some("<lost>"),
                 status: Some(418),
                 headers: vec![("X-Test", "1".to_owned())],
+                script: Some("/extra.js"),
             },
         );
         assert_eq!(page.status, 418);
@@ -995,6 +996,7 @@ mod pages_and_responses {
         );
         let html = body(&page);
         assert!(html.contains("<title>&lt;lost&gt; | Magi</title>"));
+        assert!(html.contains(r#"<script src="/extra.js" defer></script>"#));
         assert!(html.contains(r#"<section class="card"><p>hi</p></section>"#));
         let plain = render_page("x", PageOptions::default());
         assert_eq!(plain.status, 200);
@@ -1122,6 +1124,8 @@ mod pages_and_responses {
                 manage_key: "<k>",
                 alias: r#"a"b"#,
                 telegram_bot: Some(r#"Bot""#),
+                kind: LinkKind::Link,
+                view_url: None,
             },
         );
         let html = body(&response);
@@ -1148,6 +1152,8 @@ mod pages_and_responses {
                     manage_key: "k",
                     alias: "a",
                     telegram_bot: None,
+                    kind: LinkKind::Link,
+                    view_url: None,
                 },
             );
             assert!(
@@ -1212,5 +1218,26 @@ mod pages_and_responses {
         let req = magi_core::platform::Req::new(Method::Get, url);
         assert_eq!(req.host(), "localhost:8788");
         assert_eq!(req.origin(), "http://localhost:8788");
+    }
+}
+
+#[test]
+fn what_a_record_is_survives_storage_and_links_stay_as_they_were() {
+    use magi_core::store::{LinkKind, LinkMeta};
+    let link = serde_json::to_string(&LinkMeta::default()).expect("json");
+    assert!(!link.contains("kind"));
+    for (kind, name) in [
+        (LinkKind::Paste, "paste"),
+        (LinkKind::Live, "live"),
+        (LinkKind::View, "view"),
+    ] {
+        let stored = serde_json::to_string(&LinkMeta {
+            kind,
+            ..LinkMeta::default()
+        })
+        .expect("json");
+        assert!(stored.contains(&format!(r#""kind":"{name}""#)));
+        let read: LinkMeta = serde_json::from_str(&stored).expect("json");
+        assert_eq!(read.kind, kind);
     }
 }

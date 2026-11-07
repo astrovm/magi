@@ -89,7 +89,7 @@ pub async fn passes_turnstile<P: Platform>(
 /// Asks Google Safe Browsing about some destinations in one call. Without a
 /// key the check is off. Fails open: if Google is down, links still get created.
 pub async fn is_dangerous<P: Platform>(platform: &P, api_key: Option<&str>, urls: &[&str]) -> bool {
-    let Some(api_key) = api_key else {
+    let Some(api_key) = api_key.filter(|_| !urls.is_empty()) else {
         return false;
     };
     let key: String = url::form_urlencoded::byte_serialize(api_key.as_bytes()).collect();

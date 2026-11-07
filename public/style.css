@@ -233,11 +233,16 @@ textarea:focus {
   margin-top: 4px;
 }
 
+/* Buttons and rows set their own display, which would otherwise beat this. */
+[hidden] {
+  display: none !important;
+}
+
 summary {
   cursor: pointer;
   font-weight: 600;
   color: var(--gold);
-  padding: 6px 0;
+  padding: 12px 0;
   list-style: none;
   user-select: none;
 }
@@ -269,10 +274,12 @@ details[open] > summary::after {
   gap: 6px;
 }
 
-.spell-grid .check {
+.check {
+  display: flex;
   flex-direction: row;
   align-items: center;
   gap: 10px;
+  min-height: 48px;
   cursor: pointer;
 }
 
@@ -569,6 +576,124 @@ textarea {
 .chip:hover {
   color: var(--gold);
   background: rgba(255, 255, 255, 0.18);
+}
+
+/* link and paste tabs */
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.tab {
+  flex: 1;
+  min-height: 48px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--ink-soft);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid transparent;
+  border-radius: 14px;
+  cursor: pointer;
+}
+
+.tab:hover {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.tab:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.tab[aria-selected="true"] {
+  color: var(--ink);
+  background: rgba(123, 63, 228, 0.55);
+  border-color: var(--pink);
+}
+
+.paste-field {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9rem;
+  min-height: 180px;
+}
+
+/* a paste */
+
+.page .card:has(.paste) {
+  max-width: 900px;
+}
+
+.paste .btn-row {
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.paste .chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 0 18px;
+  width: auto;
+}
+
+.paste-text {
+  margin: 0;
+  padding: 16px;
+  max-height: 70vh;
+  overflow: auto;
+  text-align: left;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: var(--field);
+}
+
+.paste-text:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 2px;
+}
+
+/* a live paste */
+
+.live-status {
+  margin: 8px 0 12px;
+  font-weight: 600;
+  color: var(--gold);
+}
+
+.live-editor {
+  text-align: left;
+  margin-bottom: 12px;
+}
+
+.live-owner {
+  margin-top: 12px;
+  text-align: left;
+}
+
+.live-owner summary {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.live .btn {
+  min-height: 48px;
+}
+
+.live .link-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  overflow-wrap: anywhere;
 }
 
 /* countdown */

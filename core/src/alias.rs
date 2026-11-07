@@ -9,7 +9,7 @@ use crate::text::{
 pub const MAX_ALIAS_LENGTH: usize = 13312;
 
 /// Paths owned by the server, so they can't be used as aliases.
-pub const RESERVED_ALIASES: [&str; 3] = ["orb", "manage", "telegram"];
+pub const RESERVED_ALIASES: [&str; 4] = ["orb", "manage", "paste", "telegram"];
 
 /// Percent-decodes, leaving text with a broken escape as it was.
 fn decode(raw: &str) -> String {

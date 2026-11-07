@@ -1,11 +1,13 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "magi",
+  "account_id": "862d327a982abfbbcd56c2ea3f4060d8",
   "main": "build/index.js",
   "compatibility_date": "2026-11-06",
   "build": {
-    "command": "worker-build --release",
-    "watch_dir": ["src", "core/src"]
+    // The editor's browser code, then the Worker.
+    "command": "bun run build:live && worker-build --release",
+    "watch_dir": ["src", "core/src", "client"]
   },
   "assets": {
     "directory": "./public",
@@ -17,9 +19,13 @@
   "kv_namespaces": [
     {
       "binding": "links",
-      "id": "links"
+      "id": "00e56103338f47c89a3a4753eb79a3a3"
     }
   ],
+  "durable_objects": {
+    "bindings": [{ "name": "LIVE", "class_name": "LiveRoom" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["LiveRoom"] }],
   "observability": {
     "enabled": true,
     "traces": { "enabled": true }
