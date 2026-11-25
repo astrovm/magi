@@ -19,7 +19,7 @@
   },
   "description": "A wizard worm that powers an orb.",
   "license": "MIT",
-  "packageManager": "bun@1.4.4",
+  "packageManager": "bun@1.4.5",
   "scripts": {
     "start": "wrangler dev --port 8788",
     "lint": "bunx eslint .",
